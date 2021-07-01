@@ -15,9 +15,9 @@ Currently, this project is a Proof of Concept. @davidgs created the initial [Let
 
 When the Discourse Sentiment Analysis tool is further along, you will be able to interact with it by doing the following:
 
-1. Fill out a form with a query term you would like to run against the Camunda Platform, BPMN.io, or Camunda Cloud forums: Q2 2021
-2. You will recieve an email letting you know your query has been entered into the processing que: Q2 2021
-3. Once processed, your query results will be emailed to you: Q2 2021
+1. Fill out a form with a query term you would like to run against the Camunda Platform, BPMN.io, or Camunda Cloud forums: End of Q3 2021
+2. You will recieve an email letting you know your query has been entered into the processing que: End of Q3 2021
+3. Once processed, your query results will be emailed to you: End of Q3 2021
 
 ### Questions
 
