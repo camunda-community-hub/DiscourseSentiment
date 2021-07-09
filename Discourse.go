@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -16,9 +17,14 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"strconv"
+	"net/mail"
+		"golang.org/x/crypto/ssh/terminal"
 
 	// [START imports]
 	language "cloud.google.com/go/language/apiv1"
+	"github.com/matcornic/hermes/v2"
+	"github.com/go-gomail/gomail"
 	//"github.com/go-mail/mail"
 	// "github.com/golang/protobuf/proto"
 	// "github.com/jdkato/prose/v2"
@@ -153,6 +159,16 @@ type DiscoursePost struct {
 	} `json:"post"`
 }
 
+type Relations struct {
+	Post []struct {
+		ID             int    `json:"id"`
+		TopicID        int    `json:"topic_id"`
+		PostNumber     int    `json:"post_number"`
+		Excerpt        string `json:"excerpt"`
+		Username       string `json:"username"`
+		AvatarTemplate string `json:"avatar_template"`
+	} `json:"post"`
+}
 type queryResponse struct {
 	Success     bool          `json:"success"`
 	Errors      []interface{} `json:"errors"`
@@ -163,8 +179,17 @@ type queryResponse struct {
 	Columns      []string `json:"columns"`
 	DefaultLimit int      `json:"default_limit"`
 	Relations    struct {
+		Post []struct {
+			ID             int    `json:"id"`
+			TopicID        int    `json:"topic_id"`
+			PostNumber     int    `json:"post_number"`
+			Excerpt        string `json:"excerpt"`
+			Username       string `json:"username"`
+			AvatarTemplate string `json:"avatar_template"`
+		} `json:"post"`
 	} `json:"relations"`
 	Colrender struct {
+		Num0 string `json:"0"`
 	} `json:"colrender"`
 	Rows [][]string `json:"rows"`
 }
@@ -339,6 +364,8 @@ func runQuery(query string) {
 	var low_sent float32 = 100
 	var high_post string = ""
 	var low_post string = ""
+	var highURL string = ""
+	var lowURL string = ""
 	sent_num := 0
 	fmt.Printf("Running Query: 9\n")
 	formValues := url.Values{}
@@ -378,7 +405,11 @@ func runQuery(query string) {
 	}
 	res.Body.Close()
 	garbage := queryResponse{}
+	var prettyJSON bytes.Buffer
+	_ = json.Indent(&prettyJSON, data, "", "\t")
+	fmt.Println(string(prettyJSON.Bytes()))
 	_ = json.Unmarshal(data, &garbage)
+
 	ctx := context.Background()
 	client, err := language.NewClient(ctx, option.WithCredentialsFile("credentials.json"))
 	if err != nil {
@@ -392,14 +423,18 @@ func runQuery(query string) {
 	defer f.Close()
 	_, err = f.Write([]byte("Post\tSentiment\n"))
 
-	for x := 0; x < len(garbage.Rows); x++ {
-		sentiment, err := analyzeSentiment(ctx, client, garbage.Rows[x][0])
+	for x := 0; x < 30; x++ { //len(garbage.Rows); x++ {
+		sentiment, err := analyzeSentiment(ctx, client, garbage.Rows[x][1])
 		if err != nil {
 			log.Fatal(err)
 		}
+		pId := garbage.Relations.Post[x].ID
+		tId := garbage.Relations.Post[x].TopicID
+
+		fmt.Printf("ID: %d TopicID: %d\n", pId, tId)
 
 		reg := regexp.MustCompile(`[\n]`) // fix bolds (**foo**)
-		translated := string(reg.ReplaceAll([]byte(garbage.Rows[x][0]), []byte("")))
+		translated := string(reg.ReplaceAll([]byte(garbage.Rows[x][1]), []byte("")))
 		reg = regexp.MustCompile(`[']`)
 		translated = string(reg.ReplaceAll([]byte(translated), []byte("\\'")))
 		reg = regexp.MustCompile(`[\t]`)
@@ -409,9 +444,10 @@ func runQuery(query string) {
 		avg_sent += sentiment.DocumentSentiment.Score
 		sent_num++
 		if sentiment.DocumentSentiment.Score >= 0 {
-			if sentiment.DocumentSentiment.Score > high_sent{
+			if sentiment.DocumentSentiment.Score > high_sent {
 				high_sent = sentiment.DocumentSentiment.Score
-				high_post = translated
+				high_post = garbage.Relations.Post[x].Excerpt
+				highURL = fmt.Sprintf("https://forums.camunda.org/t/%d", garbage.Relations.Post[x].TopicID)
 			}
 			// f.Write([]byte(fmt.Sprintf("'%s'\t", translated)))
 			// f.Write([]byte(fmt.Sprintf("%.2f\n", sentiment.DocumentSentiment.Score)))
@@ -421,6 +457,8 @@ func runQuery(query string) {
 			if sentiment.DocumentSentiment.Score < low_sent {
 				low_sent = sentiment.DocumentSentiment.Score
 				low_post = translated
+				lowURL = fmt.Sprintf("https://forums.camunda.org/t/%d", garbage.Relations.Post[x].TopicID)
+
 			}
 			// f.Write([]byte(fmt.Sprintf("'%s'\t", translated)))
 			// f.Write([]byte(fmt.Sprintf("%.2f\n", sentiment.DocumentSentiment.Score)))
@@ -429,10 +467,101 @@ func runQuery(query string) {
 		}
 		time.Sleep(1 * time.Second)
 	}
+	h := hermes.Hermes{
+		// Optional Theme
+		// Theme: new(Default)
+		Product: hermes.Product{
+			// Appears in header & footer of e-mails
+			Name: "Camunda",
+			Link: "https://camunda.com/",
+			// Optional product logo
+			Logo: "https://camunda.com/&psig=AOvVaw1XnYL6hcEfkaCqzwUue-BT&ust=1625951056898000&source=images&cd=vfe&ved=0CAoQjRxqFwoTCNDJuIfy1vECFQAAAAAdAAAAABAD",
+		},
+	}
+	email := hermes.Email{
+		Body: hermes.Body{
+			Name: "Jon Snow",
+			Intros: []string{
+				"Your Sentiment Analysis is complete!",
+			},
+			// Actions: []hermes.Action{
+			//     {
+			//         Instructions: "To get started with Hermes, please click here:",
+			//         Button: hermes.Button{
+			//             Color: "#22BC66", // Optional action button color
+			//             Text:  "Confirm your account",
+			//             Link:  "https://hermes-example.com/confirm?token=d9729feb74992cc3482b350163a1a010",
+			//         },
+			//     },
+			// },
+			Outros: []string{
+				"Here's what we found in analysing the term 'connectors'",
+				"The average sentiment was: ",
+				fmt.Sprintf("%f", avg_sent),
+				"The high sentiment was: ",
+				fmt.Sprintf("%f", high_sent),
+				"Which was ",
+				high_post,
+				"You can read the whole post here: ",
+				highURL,
+				"The low sentiment was: ",
+				fmt.Sprintf("%f", low_sent),
+				"which was ",
+				low_post,
+				"And you can read that post here: ",
+				lowURL,
+			},
+		},
+	}
 
+	// Generate an HTML email with the provided contents (for modern clients)
+	emailBody, err := h.GenerateHTML(email)
+	if err != nil {
+		panic(err) // Tip: Handle error with something else than a panic ;)
+	}
+
+	// Generate the plaintext version of the e-mail (for clients that do not support xHTML)
+	emailText, err := h.GeneratePlainText(email)
+	if err != nil {
+		panic(err) // Tip: Handle error with something else than a panic ;)
+	}
+
+	// Optionally, preview the generated HTML e-mail by writing it to a local file
+	err = ioutil.WriteFile("preview.html", []byte(emailBody), 0644)
+	if err != nil {
+		panic(err) // Tip: Handle error with something else than a panic ;)
+	}
+	sendEmails := os.Getenv("HERMES_SEND_EMAILS") == "true"
+	if sendEmails {
+		port, _ := strconv.Atoi(os.Getenv("HERMES_SMTP_PORT"))
+		password := "Toby66.Mime!" //os.Getenv("HERMES_SMTP_PASSWORD")
+		SMTPUser := os.Getenv("HERMES_SMTP_USER")
+		if password == "" {
+			fmt.Printf("Enter SMTP password of '%s' account: ", SMTPUser)
+			bytePassword, _ := terminal.ReadPassword(0)
+			password = string(bytePassword)
+		}
+		smtpConfig := smtpAuthentication{
+			Server:         os.Getenv("HERMES_SMTP_SERVER"),
+			Port:           port,
+			SenderEmail:    os.Getenv("HERMES_SENDER_EMAIL"),
+			SenderIdentity: os.Getenv("HERMES_SENDER_IDENTITY"),
+			SMTPPassword:   password,
+			SMTPUser:       SMTPUser,
+		}
+		options := sendOptions{
+				To: "davidgs@me.com",
+		}
+		options.Subject = "Camunda Sentiment"
+		fmt.Printf("Sending email '%s'...\n", options.Subject)
+		err = send(smtpConfig, options, string(emailBody), string(emailText))
+		if err != nil {
+			panic(err)
+		}
+	}
 	f.Close()
-	avg_sent = avg_sent/float32(sent_num)
-	fmt.Printf("Average: .2%f\nLow score: .2%f\nLow Post: %s\nHigh score: .2%f\nHigh post: %s\n", avg_sent, low_sent, low_post, high_sent, high_post)
+	avg_sent = avg_sent / float32(sent_num)
+	fmt.Printf("Average: %f.2\nLow score: %f.2\nLow Post: %s\nHigh score: %f.2\nHigh post: %s\n", avg_sent, low_sent, low_post, high_sent, high_post)
 	// var usernameColumn int
 	// for z := 0; z < len(oData.Columns); z++ {
 	// 	if oData.Columns[z] == "id" || oData.Columns[z] == "user_id" {
@@ -453,4 +582,62 @@ func main() {
 	// if err != nil {
 	// 	log.Fatal("ListenAndServe: ", err)
 	// }
+}
+type smtpAuthentication struct {
+	Server         string
+	Port           int
+	SenderEmail    string
+	SenderIdentity string
+	SMTPUser       string
+	SMTPPassword   string
+}
+
+// sendOptions are options for sending an email
+type sendOptions struct {
+	To      string
+	Subject string
+}
+
+// send sends the email
+func send(smtpConfig smtpAuthentication, options sendOptions, htmlBody string, txtBody string) error {
+
+	if smtpConfig.Server == "" {
+		return errors.New("SMTP server config is empty")
+	}
+	if smtpConfig.Port == 0 {
+		return errors.New("SMTP port config is empty")
+	}
+
+	if smtpConfig.SMTPUser == "" {
+		return errors.New("SMTP user is empty")
+	}
+
+	if smtpConfig.SenderIdentity == "" {
+		return errors.New("SMTP sender identity is empty")
+	}
+
+	if smtpConfig.SenderEmail == "" {
+		return errors.New("SMTP sender email is empty")
+	}
+
+	if options.To == "" {
+		return errors.New("no receiver emails configured")
+	}
+
+	from := mail.Address{
+		Name:    smtpConfig.SenderIdentity,
+		Address: smtpConfig.SenderEmail,
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", from.String())
+	m.SetHeader("To", options.To)
+	m.SetHeader("Subject", options.Subject)
+
+	m.SetBody("text/plain", txtBody)
+	m.AddAlternative("text/html", htmlBody)
+
+	d := gomail.NewDialer(smtpConfig.Server, smtpConfig.Port, smtpConfig.SMTPUser, smtpConfig.SMTPPassword)
+
+	return d.DialAndSend(m)
 }
