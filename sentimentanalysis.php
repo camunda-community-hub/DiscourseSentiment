@@ -12,7 +12,7 @@
 
 <h1>Camunda Sentiment Analysis Form</h1>
 
-<h2>A form which if given a term you'd like to query on the Camunda Forums, will then run the specified query and return the results to you via email. 
+<h2>A form which if given a term you'd like to query on the Camunda Forums, will then run the specified query and return the results to you via email.
 Please note that queries take time to run, and may take longer depending on the number of queries in the current que.</h2>
 
 <?php

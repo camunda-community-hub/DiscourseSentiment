@@ -2,44 +2,53 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
-	"net/mail"
-		"golang.org/x/crypto/ssh/terminal"
 
 	// [START imports]
 	language "cloud.google.com/go/language/apiv1"
-	"github.com/matcornic/hermes/v2"
 	"github.com/go-gomail/gomail"
-	//"github.com/go-mail/mail"
-	// "github.com/golang/protobuf/proto"
-	// "github.com/jdkato/prose/v2"
+	"github.com/matcornic/hermes/v2"
+	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/api/option"
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
-	// camundaclientgo "github.com/citilinkru/camunda-client-go"
 )
 
 const secret string = "camundaBPMDiscourseTester"
 
 // APIKey is your Discourse API_KEY here
-const APIKey = "0476e2a15a1152d8c00c1eeec60bbcec4977e54b87f2d7556a857e814c5a4fb0"
+const PlatformAPIKey = "0476e2a15a1152d8c00c1eeec60bbcec4977e54b87f2d7556a857e814c5a4fb0"
+const PlatformURL = "https://forum.camunda.org/admin/plugins/explorer/queries/9/run"
+const BPMNAPIKey = "d909293c78ee5cc6fa055419da5f9682a595341a2eb1acb02ce17d7bcb7c060c"
+const BPMNUrl = "https://forum.bpmn.io/admin/plugins/explorer/queries/2/run"
+
+const CloudAPIKey = ""
+const CloudURL = "https://forum.camunda.io"
 
 // APIUser is your Discourse User ID
 const APIUser = "davidgs"
+
+type Submitter struct {
+	Username   string `json:"username"`
+	Email      string `json:"emailAddress"`
+	Forum      string `json:"community"`
+	SearchTerm string `json:"searchterm"`
+}
+
+var submitter = Submitter{}
 
 type lastesPosts struct {
 	Users []struct {
@@ -233,13 +242,6 @@ func sendData(s DiscoursePost) {
 		log.Fatal(err)
 		return
 	}
-
-	// doc, _ := prose.NewDocument(post)
-	// sents := doc.Sentences()
-	// fmt.Printf("Letter is %d sentences long.\n", len(sents)) // 2
-
-	// for _, sent := range sents {
-	// 	fmt.Printf("Sentence: %s\n", sent.Text)
 	sentiment, err := analyzeSentiment(ctx, client, post)
 	if err != nil {
 		log.Fatal(err)
@@ -249,10 +251,6 @@ func sendData(s DiscoursePost) {
 	} else {
 		fmt.Printf("Sentiment: %1f negative\t", sentiment.DocumentSentiment.Score)
 	}
-	// }
-	// fmt.Println("Post Topic: ", topic)
-	// fmt.Println("Post Text: ", post)
-
 }
 
 // [START language_entities_text]
@@ -323,38 +321,34 @@ func classifyText(ctx context.Context, client *language.Client, text string) (*l
 // recieve topics from Discourse
 func topicEvent(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		fmt.Println("GET Method Not Supported")
 		http.Error(w, "GET Method not supported", 400)
 	} else {
 		data, err := ioutil.ReadAll(r.Body)
+		// fmt.Println(string(data))
 		if err != nil {
 			log.Fatal("Got no Data")
 		}
 		r.Body.Close()
-		h := hmac.New(sha256.New, []byte(secret))
+		http.Redirect(w, r, "https://davidgs.com:9999/thanks.html", http.StatusSeeOther)
+		w.WriteHeader(200)
+		qString := html.UnescapeString(string(data))
+		fmt.Println(qString)
+		foo := strings.Split(qString, "&")
+		for x := 0; x < len(foo); x++ {
+			fmt.Println(foo[x])
+			if strings.HasPrefix(foo[x], "username") {
+				submitter.Username = strings.ReplaceAll(strings.Split(foo[x], "=")[1], "+", " ")
+			} else if strings.HasPrefix(foo[x], "emailAddress") {
+				submitter.Email = strings.ReplaceAll(strings.Split(foo[x], "=")[1], "%40", "@")
+			} else if strings.HasPrefix(foo[x], "community") {
+				submitter.Forum = strings.Split(foo[x], "=")[1]
+			} else if strings.HasPrefix(foo[x], "searchterm") {
+				submitter.SearchTerm = strings.ReplaceAll(strings.Split(foo[x], "=")[1], "+", " ")
+			} else {
 
-		// Write Data to it
-		h.Write([]byte(data))
-
-		// Get result and encode as hexadecimal string
-		sha := "sha256=" + hex.EncodeToString(h.Sum(nil))
-		incomingSha := r.Header.Get("X-Discourse-Event-Signature")
-		fmt.Println("Sha256: ", sha)
-		fmt.Println("Incoming: ", incomingSha)
-		fmt.Println("Raw: ", string(data))
-		if sha != incomingSha {
-			fmt.Println("Message Header did not pass")
-			http.Error(w, "Invalid Message Signature", 500)
-		} else {
-			var t DiscoursePost
-			_ = json.Unmarshal(data, &t)
-			var prettyJSON bytes.Buffer
-			_ = json.Indent(&prettyJSON, data, "", "\t")
-			//fmt.Println(string(prettyJSON.Bytes()))
-			sendData(t)
-			w.WriteHeader(200)
+			}
 		}
-
+		runQuery(submitter.SearchTerm)
 	}
 }
 
@@ -374,18 +368,27 @@ func runQuery(query string) {
 	}
 	formValues.Set("query", query)
 	var DefaultClient = &http.Client{}
-	urlPlace := "https://forum.camunda.org/admin/plugins/explorer/queries/9" + "/run"
+
+	urlPlace := ""
+	myKey := ""
+	if submitter.Forum == "platform" {
+		urlPlace = PlatformURL
+		myKey = PlatformAPIKey
+	} else if submitter.Forum == "Cloud" {
+
+	} else if submitter.Forum == "BPMN.io" {
+		urlPlace = BPMNUrl
+		myKey = BPMNAPIKey
+	}
 	request, err := http.NewRequest("POST", urlPlace, strings.NewReader(formValues.Encode()))
 	if err != nil {
 		fmt.Println("Request Object Failure")
 		log.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "multipart/form-data")
-	request.Header.Set("Api-Key", APIKey)
+	request.Header.Set("Api-Key", myKey)
 	request.Header.Set("Api-Username", APIUser)
 	request.Header.Set("Accept", "application/json")
-	// var FinalResults []Results
-	// var oData = QueryResult{}
 
 	res, err := DefaultClient.Do(request)
 	if err != nil {
@@ -423,7 +426,7 @@ func runQuery(query string) {
 	defer f.Close()
 	_, err = f.Write([]byte("Post\tSentiment\n"))
 
-	for x := 0; x < 30; x++ { //len(garbage.Rows); x++ {
+	for x := 0; x < 10; x++ { //len(garbage.Rows); x++ {
 		sentiment, err := analyzeSentiment(ctx, client, garbage.Rows[x][1])
 		if err != nil {
 			log.Fatal(err)
@@ -447,32 +450,23 @@ func runQuery(query string) {
 			if sentiment.DocumentSentiment.Score > high_sent {
 				high_sent = sentiment.DocumentSentiment.Score
 				high_post = garbage.Relations.Post[x].Excerpt
-				highURL = fmt.Sprintf("https://forums.camunda.org/t/%d", garbage.Relations.Post[x].TopicID)
+				highURL = fmt.Sprintf("%s/t/%d", urlPlace, garbage.Relations.Post[x].TopicID)
 			}
-			// f.Write([]byte(fmt.Sprintf("'%s'\t", translated)))
-			// f.Write([]byte(fmt.Sprintf("%.2f\n", sentiment.DocumentSentiment.Score)))
-			// fmt.Printf("'%s'\t%.2f\n", translated, sentiment.DocumentSentiment.Score)
-			// fmt.Printf("Sentiment: %1f, positive\n", sentiment.DocumentSentiment.Score)
 		} else {
 			if sentiment.DocumentSentiment.Score < low_sent {
 				low_sent = sentiment.DocumentSentiment.Score
 				low_post = translated
-				lowURL = fmt.Sprintf("https://forums.camunda.org/t/%d", garbage.Relations.Post[x].TopicID)
-
+				lowURL = fmt.Sprintf("%s/t/%d", urlPlace, garbage.Relations.Post[x].TopicID)
 			}
-			// f.Write([]byte(fmt.Sprintf("'%s'\t", translated)))
-			// f.Write([]byte(fmt.Sprintf("%.2f\n", sentiment.DocumentSentiment.Score)))
-			// fmt.Printf("'%s'\t%.2f\n", translated, sentiment.DocumentSentiment.Score)
-			// fmt.Printf("Sentiment: %1f negative\n", sentiment.DocumentSentiment.Score)
 		}
 		time.Sleep(1 * time.Second)
 	}
 	h := hermes.Hermes{
 		// Optional Theme
-		// Theme: new(Default)
+		// Theme: new(Default),
 		Product: hermes.Product{
 			// Appears in header & footer of e-mails
-			Name: "Camunda",
+			Name: "Camunda, Inc.",
 			Link: "https://camunda.com/",
 			// Optional product logo
 			Logo: "https://camunda.com/&psig=AOvVaw1XnYL6hcEfkaCqzwUue-BT&ust=1625951056898000&source=images&cd=vfe&ved=0CAoQjRxqFwoTCNDJuIfy1vECFQAAAAAdAAAAABAD",
@@ -480,7 +474,7 @@ func runQuery(query string) {
 	}
 	email := hermes.Email{
 		Body: hermes.Body{
-			Name: "Jon Snow",
+			Name: submitter.Username,
 			Intros: []string{
 				"Your Sentiment Analysis is complete!",
 			},
@@ -534,7 +528,7 @@ func runQuery(query string) {
 	sendEmails := os.Getenv("HERMES_SEND_EMAILS") == "true"
 	if sendEmails {
 		port, _ := strconv.Atoi(os.Getenv("HERMES_SMTP_PORT"))
-		password := "Toby66.Mime!" //os.Getenv("HERMES_SMTP_PASSWORD")
+		password := os.Getenv("HERMES_SMTP_PASSWORD")
 		SMTPUser := os.Getenv("HERMES_SMTP_USER")
 		if password == "" {
 			fmt.Printf("Enter SMTP password of '%s' account: ", SMTPUser)
@@ -550,7 +544,7 @@ func runQuery(query string) {
 			SMTPUser:       SMTPUser,
 		}
 		options := sendOptions{
-				To: "davidgs@me.com",
+			To: submitter.Email,
 		}
 		options.Subject = "Camunda Sentiment"
 		fmt.Printf("Sending email '%s'...\n", options.Subject)
@@ -561,7 +555,7 @@ func runQuery(query string) {
 	}
 	f.Close()
 	avg_sent = avg_sent / float32(sent_num)
-	fmt.Printf("Average: %f.2\nLow score: %f.2\nLow Post: %s\nHigh score: %f.2\nHigh post: %s\n", avg_sent, low_sent, low_post, high_sent, high_post)
+	fmt.Printf("Average: %f2\nLow score: %f2\nLow Post: %s\nHigh score: %f2\nHigh post: %s\n", avg_sent, low_sent, low_post, high_sent, high_post)
 	// var usernameColumn int
 	// for z := 0; z < len(oData.Columns); z++ {
 	// 	if oData.Columns[z] == "id" || oData.Columns[z] == "user_id" {
@@ -573,16 +567,15 @@ func runQuery(query string) {
 }
 func main() {
 	fmt.Println("Starting up ... ")
-	// fs := http.FileServer(http.Dir("/Users/davidgs/github.com/CamundaHalloween/GoServer/test/"))
-	runQuery("connectors")
-	// http.HandleFunc("/topic", topicEvent)
+	http.Handle("/", http.FileServer(http.Dir("./static")))
+	http.HandleFunc("/sentiment", topicEvent)
 	// // http.Handle("/test/", http.StripPrefix("/test", fs)) // set router
-	// err := http.ListenAndServeTLS(":9090", "/home/davidgs/.node-red/combined", "/home/davidgs/.node-red/combined", nil) // set listen port
-	// // err := http.ListenAndServe(":9090", nil)
-	// if err != nil {
-	// 	log.Fatal("ListenAndServe: ", err)
-	// }
+	err := http.ListenAndServeTLS(":9999", "/home/davidgs/.node-red/combined", "/home/davidgs/.node-red/combined", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
+
 type smtpAuthentication struct {
 	Server         string
 	Port           int
