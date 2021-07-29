@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-us" lang="en-us">
+
+<head>
+  <link href="https://gmpg.org/xfn/11" rel="profile">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="generator" content="Hugo 0.84.2" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Camunda Sentiment Analysis</title>
+  <meta name="description" content="A Sentiment Analysis Tool for Camunda Communities" />
+
+
+  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/print.css" media="print">
+  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/poole.css">
+  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/syntax.css">
+  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/hyde.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Abril+Fatface|PT+Sans:400,400i,700">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+    integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/apple-touch-icon-144-precomposed.png">
+  <link rel="shortcut icon" href="/favicon.png">
+
+
+  <link href="https://davidgs.com:9999/index.xml" rel="alternate" type="application/rss+xml"
+    title="Camunda Sentiment Analysis" />
+
+</head>
+
+<body class="theme-base-09 ">
+  <aside class="sidebar">
+    <div class="container sidebar-sticky">
+      <div class="sidebar-about">
+        <a href="https://davidgs.com:9999/">
+          <h1>Camunda Sentiment Analysis</h1>
+        </a>
+        <p class="lead">
+          A Sentiment Analysis Tool for Camunda Communities
+        </p>
+      </div>
+
+      <nav>
+        <ul class="sidebar-nav">
+          <li><a href="https://davidgs.com:9999/">Home</a> </li>
+          <li><a href="https://github.com/davidgs/"> Github </a></li>
+        </ul>
+      </nav>
+
+      <p>&copy; 2021. All rights reserved. </p>
+    </div>
+  </aside>
+
+  <main class="content container">
+    <div class="posts">
+      <article class="post">
+        <h1 class="post-title">
+          <a href="https://davidgs.com:9999/form/">Analyze a Term</a>
+        </h1>
+        <time datetime="2021-07-13T00:00:00Z" class="post-date">Tues July 13, 2021</time>
+        <h1>Camunda Sentiment Analysis Form</h1>
+
+        <h2>Want to know what our users think? Simply fill out this form and find out!</h2>
+
+        <p>Enter your full name, your email address, and choose which of our User Discussion properties you want to
+          query. Then
+          add the search term you are interested in analyzing.</p>
+        <p>Once you submit the form the process will begin. Once completed, you will recieve an email with the results
+          of your
+          analysis.</p>
+        <p><strong>Note:</strong> The analysis process can take anywhere from a few minutes to a few hours, so please be
+          patient!</p>
+
+        <form action="https://davidgs.com:9999/sentiment" method="POST" role="form" class="form-horizontal">
+          <fieldset>
+
+            <!-- Text input-->
+            <div class="form-group">
+              <label class="col-md-4 control-label" for="username">Full Name</label>
+              <div class="col-md-4">
+                <input id="username" name="username" type="text" placeholder="FirstName LastName"
+                  class="form-control input-md" required="">
+
+              </div>
+            </div>
+
+            <!-- Text input-->
+            <div class="form-group">
+              <label class="col-md-4 control-label" for="emailAddress">Email Address</label>
+              <div class="col-md-4">
+                <input id="emailAddress" name="emailAddress" type="text" placeholder="name@camunda.com"
+                  class="form-control input-md" required="">
+
+              </div>
+            </div>
+
+            <!-- Select Basic -->
+            <div class="form-group">
+              <label class="col-md-4 control-label" for="community">Which Community?</label>
+              <div class="col-md-4">
+                <select id="community" name="community" class="form-control">
+                  <option value="platform">Camunda Platform</option>
+                  <option value="bpmn.io">BPMN.io</option>
+                  <option value="cloud">Camunda Cloud</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Search input-->
+            <div class="form-group">
+              <label class="col-md-4 control-label" for="searchterm">Search Term</label>
+              <div class="col-md-4">
+                <input id="searchterm" name="searchterm" type="search" placeholder="placeholder"
+                  class="form-control input-md" required="">
+                <p class="help-block">single word or phrase.</p>
+              </div>
+            </div>
+
+            <!-- Button -->
+            <div class="form-group">
+              <label class="col-md-4 control-label" for="submit"></label>
+              <div class="col-md-4">
+                <button id="submit" name="submit" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+
+          </fieldset>
+        </form>
+
+      </article>
+    </div>
+  </main>
+
+
+
+
+</body>
+
+</html>
