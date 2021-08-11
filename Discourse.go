@@ -778,6 +778,7 @@ func extendLock(contx *processor.Context, extTime int) error {
 	extender["workerId"] = "SentimentAnalyzer"
 	data, err := json.Marshal(extender)
 	exUrl := fmt.Sprintf("%s/external-task/%s/extendLock", camundaServer, contx.Task.Id)
+	fmt.Println(exUrl)
 	request, err := http.NewRequest("POST", exUrl, bytes.NewReader(data))
 	if err != nil {
 		fmt.Println("Request Object Failure")
