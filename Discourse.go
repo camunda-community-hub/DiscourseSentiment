@@ -698,6 +698,7 @@ func runAnalysis(newVars map[string]camundaclientgo.Variable, contx *processor.C
 	res, err := DefaultClient.Do(request)
 	if err != nil {
 		fmt.Printf("HTTP POST Failed! %s\n", urlPlace)
+		fmt.Println(err)
 		return err
 	}
 	if res.StatusCode != 200 {
@@ -770,6 +771,7 @@ func runAnalysis(newVars map[string]camundaclientgo.Variable, contx *processor.C
 }
 
 func extendLock(contx *processor.Context, extTime int) error {
+	fmt.Printf("Extending lock by %d\n", extTime)
 	var DefaultClient = &http.Client{}
 	extender := make(map[string]interface{})
 	extender["newDuration"] = extTime
@@ -786,6 +788,7 @@ func extendLock(contx *processor.Context, extTime int) error {
 	res, err := DefaultClient.Do(request)
 	if err != nil {
 		fmt.Printf("HTTP POST Failed! %s\n", exUrl)
+		fmt.Println(err)
 		return err
 	}
 	if res.StatusCode != 204 {
