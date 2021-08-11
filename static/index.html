@@ -13,30 +13,28 @@
   <meta name="description" content="A Sentiment Analysis Tool for Camunda Communities" />
 
 
-  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/print.css" media="print">
-  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/poole.css">
-  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/syntax.css">
-  <link type="text/css" rel="stylesheet" href="https://davidgs.com:9999/css/hyde.css">
+  <link type="text/css" rel="stylesheet" href="https://sentiment.camunda.com/css/print.css" media="print">
+  <link type="text/css" rel="stylesheet" href="https://sentiment.camunda.com/css/poole.css">
+  <link type="text/css" rel="stylesheet" href="https://sentiment.camunda.com/css/syntax.css">
+  <link type="text/css" rel="stylesheet" href="https://sentiment.camunda.com/css/hyde.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Abril+Fatface|PT+Sans:400,400i,700">
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
     integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
 
+  <script src="/js/sentiment.js"></script>
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/images/apple-touch-icon-144-precomposed.png">
+  <link rel="shortcut icon" href="/imagages/favicon.png">
 
-  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/apple-touch-icon-144-precomposed.png">
-  <link rel="shortcut icon" href="/favicon.png">
-
-
-  <link href="https://davidgs.com:9999/index.xml" rel="alternate" type="application/rss+xml"
-    title="Camunda Sentiment Analysis" />
 
 </head>
 
 <body class="theme-base-09 ">
   <aside class="sidebar">
+    <a href="https://camunda.com/" target="_blank"><img src="images/Logo_White.svg"></a>
     <div class="container sidebar-sticky">
       <div class="sidebar-about">
-        <a href="https://davidgs.com:9999/">
-          <h1>Camunda Sentiment Analysis</h1>
+        <a href="https://sentiment.camunda.com/">
+          <h1>Sentiment Analysis</h1>
         </a>
         <p class="lead">
           A Sentiment Analysis Tool for Camunda Communities
@@ -45,12 +43,13 @@
 
       <nav>
         <ul class="sidebar-nav">
-          <li><a href="https://davidgs.com:9999/">Home</a> </li>
+          <li><a href="https://sentiment.camunda.com/">Home</a> </li>
           <li><a href="https://github.com/davidgs/"> Github </a></li>
         </ul>
       </nav>
 
-      <p>&copy; 2021. All rights reserved. </p>
+      <p style="text-align: right; margin-right: 15px;">&copy; Camunda, Inc. 2021</br>
+        All rights reserved</p>
     </div>
   </aside>
 
@@ -58,9 +57,9 @@
     <div class="posts">
       <article class="post">
         <h1 class="post-title">
-          <a href="https://davidgs.com:9999/form/">Analyze a Term</a>
+          <a href="https://sentiment.camunda.com/">Analyze a Term</a>
         </h1>
-        <time datetime="2021-07-13T00:00:00Z" class="post-date">Tues July 13, 2021</time>
+        <time id="time" datetime="2021-07-13T00:00:00Z" class="post-date">Tues July 13, 2021</time>
         <h1>Camunda Sentiment Analysis Form</h1>
 
         <h2>Want to know what our users think? Simply fill out this form and find out!</h2>
@@ -74,7 +73,7 @@
         <p><strong>Note:</strong> The analysis process can take anywhere from a few minutes to a few hours, so please be
           patient!</p>
 
-        <form action="https://davidgs.com:9999/sentiment" method="POST" role="form" class="form-horizontal">
+        <form action="https://sentiment.camunda.com/sentiment" method="POST" role="form" class="form-horizontal">
           <fieldset>
 
             <!-- Text input-->
@@ -133,7 +132,9 @@
       </article>
     </div>
   </main>
-
+<script type="text/javascript">
+  document.addEventListener('DOMContentLoaded', setDate ());
+</script>
 
 
 

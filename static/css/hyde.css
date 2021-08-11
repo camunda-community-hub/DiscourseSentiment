@@ -58,7 +58,7 @@ html {
   padding: 2rem 1rem;
   color: rgba(255,255,255,.5);
   background-color: #202020;
-  
+
 }
 @media (min-width: 48em) {
   .sidebar {
@@ -190,6 +190,10 @@ a.sidebar-nav-item:focus {
 /* Orange */
 .theme-base-09 .sidebar {
   background-color: #FF4700;
+  background-image: url(../images/bg-orange.png);
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 .theme-base-09 .content a,
 .theme-base-09 .related-posts li a:hover {
