@@ -652,7 +652,7 @@ func getNext(newVars map[string]camundaclientgo.Variable, contx *processor.Conte
 }
 
 func runAnalysis(newVars map[string]camundaclientgo.Variable, contx *processor.Context) error {
-
+	fmt.Println("Running the analysis ...")
 	var avg_sent float32 = 0.00
 	var high_sent float32 = -100
 	var low_sent float32 = 100
@@ -697,7 +697,7 @@ func runAnalysis(newVars map[string]camundaclientgo.Variable, contx *processor.C
 
 	res, err := DefaultClient.Do(request)
 	if err != nil {
-		fmt.Println("HTTP GET Failed!", urlPlace)
+		fmt.Printf("HTTP POST Failed! %s\n", urlPlace)
 		return err
 	}
 	if res.StatusCode != 200 {
@@ -785,7 +785,7 @@ func extendLock(contx *processor.Context, extTime int) error {
 	request.Header.Set("Accept", "application/json")
 	res, err := DefaultClient.Do(request)
 	if err != nil {
-		fmt.Println("HTTP GET Failed!", exUrl)
+		fmt.Printf("HTTP POST Failed! %s\n", exUrl)
 		return err
 	}
 	if res.StatusCode != 204 {
