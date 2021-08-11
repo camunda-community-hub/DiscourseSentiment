@@ -570,7 +570,7 @@ func getUrl(url string) ProcessQueryResult {
 
 	res, err := DefaultClient.Do(request)
 	if err != nil {
-		fmt.Println("HTTP GET Failed!")
+		fmt.Println("HTTP GET Failed!", url)
 		log.Fatal(err)
 	}
 	if res.StatusCode >= 220 {
@@ -697,7 +697,7 @@ func runAnalysis(newVars map[string]camundaclientgo.Variable, contx *processor.C
 
 	res, err := DefaultClient.Do(request)
 	if err != nil {
-		fmt.Println("HTTP GET Failed!")
+		fmt.Println("HTTP GET Failed!", urlPlace)
 		return err
 	}
 	if res.StatusCode != 200 {
@@ -785,7 +785,7 @@ func extendLock(contx *processor.Context, extTime int) error {
 	request.Header.Set("Accept", "application/json")
 	res, err := DefaultClient.Do(request)
 	if err != nil {
-		fmt.Println("HTTP GET Failed!")
+		fmt.Println("HTTP GET Failed!", exUrl)
 		return err
 	}
 	if res.StatusCode != 204 {
