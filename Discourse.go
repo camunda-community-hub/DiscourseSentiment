@@ -510,7 +510,7 @@ func main() {
 	asyncResponseTimeout := 5000
 	proc := processor.NewProcessor(client, &processor.ProcessorOptions{
 		WorkerId:                  "SentimentAnalyzer",
-		LockDuration:              time.Second * 240,
+		LockDuration:              time.Second * 20,
 		MaxTasks:                  10,
 		MaxParallelTaskPerHandler: 100,
 		LongPollingTimeout:        20 * time.Second,
@@ -788,6 +788,7 @@ func extendLock(contx *processor.Context, extTime int) error {
 	request.Header.Set("Accept", "application/json")
 	res, err := DefaultClient.Do(request)
 	if err != nil {
+		fmt.Println(exUrl)
 		fmt.Printf("HTTP POST Failed! %s\n", exUrl)
 		fmt.Println(err)
 		return err
