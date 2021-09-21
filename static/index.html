@@ -21,9 +21,9 @@
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
     integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
 
-  <script src="/js/sentiment.js"></script>
-  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/images/apple-touch-icon-144-precomposed.png">
-  <link rel="shortcut icon" href="/imagages/favicon.png">
+  <script src="https://sentiment.camunda.com/js/sentiment.js"></script>
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="https://sentiment.camunda.com/images/apple-touch-icon-144-precomposed.png">
+  <link rel="shortcut icon" href="https://sentiment.camunda.com/images/favicon.jpg">
 
 
 </head>
@@ -39,6 +39,9 @@
         <p class="lead">
           A Sentiment Analysis Tool for Camunda Communities
         </p>
+        <p class="lead">
+          Brought to you by</br><a href="https://confluence.camunda.com/display/camBPM/Developer+Relations" target="_blank">The DevRel Team</a>
+        </p>
       </div>
 
       <nav>
@@ -53,7 +56,7 @@
     </div>
   </aside>
 
-  <main class="content container">
+  <main class="theme-base-09 content container align-fix">
     <div class="posts">
       <article class="post">
         <h1 class="post-title">
@@ -73,7 +76,7 @@
         <p><strong>Note:</strong> The analysis process can take anywhere from a few minutes to a few hours, so please be
           patient!</p>
 
-        <form action="https://sentiment.camunda.com/sentiment" method="POST" role="form" class="form-horizontal">
+        <form action="http://localhost:9999/sentiment" method="POST" role="form" class="form-horizontal">
           <fieldset>
 
             <!-- Text input-->
@@ -102,7 +105,7 @@
               <div class="col-md-4">
                 <select id="community" name="community" class="form-control">
                   <option value="platform">Camunda Platform</option>
-                  <option value="bpmn.io">BPMN.io</option>
+                  <option value="bpmn">BPMN.io</option>
                   <option value="cloud">Camunda Cloud</option>
                 </select>
               </div>
@@ -115,9 +118,12 @@
                 <input id="searchterm" name="searchterm" type="search" placeholder="placeholder"
                   class="form-control input-md" required="">
                 <p class="help-block">single word or phrase.</p>
+
               </div>
             </div>
-
+            <div class="form-group">
+              <input id="exact" name="exact" type="checkbox"><label class="col-md-4 control-label" for="exact"><em>Exact</em> Match</label>
+            </div>
             <!-- Button -->
             <div class="form-group">
               <label class="col-md-4 control-label" for="submit"></label>

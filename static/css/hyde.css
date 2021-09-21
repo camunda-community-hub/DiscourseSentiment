@@ -199,7 +199,22 @@ a.sidebar-nav-item:focus {
 .theme-base-09 .related-posts li a:hover {
   color: #FF4700;
 }
+ 
+.theme-base-09 .container {
+  width: 100%;
+  padding-right: 15px;
+  padding-left: 15px;
+  margin-right: auto;
+  margin-left: auto; 
+}
 
+.theme-base-09 .container.align-fix {
+  width: 100%;
+  padding-right: 15px;
+  padding-left: 15px;
+  margin-right: auto;
+  margin-left: 20em;
+}
 /* Yellow */
 .theme-base-0a .sidebar {
   background-color: #f4bf75;

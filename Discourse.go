@@ -5,229 +5,81 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"html"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/mail"
-	"net/url"
 	"os"
 	"regexp"
-	"strconv"
+
+	// "regexp"
 	"strings"
 	"time"
 
-	// [START imports]
+	// [START external imports]
 	language "cloud.google.com/go/language/apiv1"
 	camundaclientgo "github.com/citilinkru/camunda-client-go/v2"
 	"github.com/citilinkru/camunda-client-go/v2/processor"
 	"github.com/go-gomail/gomail"
 	"github.com/matcornic/hermes/v2"
+
+	// "github.com/opentracing/opentracing-go/log"
+	"github.com/russross/blackfriday/v2"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
+	"gopkg.in/yaml.v2"
 )
-const serverBase = "https://sentiment.camunda.com"
-const secret string = "camundaBPMDiscourseTester"
-const camundaServer = serverBase + ":8443/engine-rest"
 
-// APIKey is your Discourse API_KEY here
-const PlatformAPIKey = "0476e2a15a1152d8c00c1eeec60bbcec4977e54b87f2d7556a857e814c5a4fb0"
-const PlatformURL = "https://forum.camunda.org/admin/plugins/explorer/queries/9/run"
-const BPMNAPIKey = "d909293c78ee5cc6fa055419da5f9682a595341a2eb1acb02ce17d7bcb7c060c"
-const BPMNUrl = "https://forum.bpmn.io/admin/plugins/explorer/queries/2/run"
-
-const CloudAPIKey = "b43ac8b6f5b178860d20e84ddca232a7c8fea3cb1a195ea03b16ab6b92f2b6d4"
-const CloudURL = "https://forum.camunda.io/admin/plugins/explorer/queries/3/run"
-
-// APIUser is your Discourse User ID
-const APIUser = "davidgs"
-
+// Submitter is where we keep track of all the info about who submitted what.
 type Submitter struct {
-	Username   string `json:"username"`
-	Email      string `json:"emailAddress"`
-	Forum      string `json:"community"`
-	SearchTerm string `json:"searchterm"`
+	Username      string `json:"username"`
+	Email         string `json:"emailAddress"`
+	Forum         string `json:"community"`
+	SearchTerm    string `json:"searchterm"`
+	ThemeTemplate string `json:"themeTemplate,omitempty"`
+	ThemeTemp     string `json:"themeTemp,omitempty"`
+	Exact         string `json:"exact,omitempty"`
+	Total				 int    `json:"total,omitempty"`
 }
 
-var submitter = Submitter{}
-
-type lastesPosts struct {
-	Users []struct {
-		ID             int    `json:"id"`
-		Username       string `json:"username"`
-		Name           string `json:"name"`
-		AvatarTemplate string `json:"avatar_template"`
-	} `json:"users"`
-	PrimaryGroups []struct {
-		ID           int    `json:"id"`
-		Name         string `json:"name"`
-		FlairURL     string `json:"flair_url"`
-		FlairBgColor string `json:"flair_bg_color"`
-		FlairColor   string `json:"flair_color"`
-	} `json:"primary_groups"`
-	TopicList struct {
-		CanCreateTopic bool        `json:"can_create_topic"`
-		MoreTopicsURL  string      `json:"more_topics_url"`
-		Draft          interface{} `json:"draft"`
-		DraftKey       string      `json:"draft_key"`
-		DraftSequence  int         `json:"draft_sequence"`
-		PerPage        int         `json:"per_page"`
-		Topics         []struct {
-			ID                 int         `json:"id"`
-			Title              string      `json:"title"`
-			FancyTitle         string      `json:"fancy_title"`
-			Slug               string      `json:"slug"`
-			PostsCount         int         `json:"posts_count"`
-			ReplyCount         int         `json:"reply_count"`
-			HighestPostNumber  int         `json:"highest_post_number"`
-			ImageURL           string      `json:"image_url"`
-			CreatedAt          time.Time   `json:"created_at"`
-			LastPostedAt       time.Time   `json:"last_posted_at"`
-			Bumped             bool        `json:"bumped"`
-			BumpedAt           time.Time   `json:"bumped_at"`
-			Archetype          string      `json:"archetype"`
-			Unseen             bool        `json:"unseen"`
-			LastReadPostNumber int         `json:"last_read_post_number,omitempty"`
-			Unread             int         `json:"unread,omitempty"`
-			NewPosts           int         `json:"new_posts,omitempty"`
-			Pinned             bool        `json:"pinned"`
-			Unpinned           interface{} `json:"unpinned"`
-			Visible            bool        `json:"visible"`
-			Closed             bool        `json:"closed"`
-			Archived           bool        `json:"archived"`
-			NotificationLevel  int         `json:"notification_level,omitempty"`
-			Bookmarked         bool        `json:"bookmarked"`
-			Liked              bool        `json:"liked"`
-			Views              int         `json:"views"`
-			LikeCount          int         `json:"like_count"`
-			HasSummary         bool        `json:"has_summary"`
-			LastPosterUsername string      `json:"last_poster_username"`
-			CategoryID         int         `json:"category_id"`
-			PinnedGlobally     bool        `json:"pinned_globally"`
-			FeaturedLink       interface{} `json:"featured_link"`
-			HasAcceptedAnswer  bool        `json:"has_accepted_answer"`
-			Posters            []struct {
-				Extras         interface{} `json:"extras"`
-				Description    string      `json:"description"`
-				UserID         int         `json:"user_id"`
-				PrimaryGroupID interface{} `json:"primary_group_id"`
-			} `json:"posters"`
-		} `json:"topics"`
-	} `json:"topic_list"`
+// ServerSettings is all the stuff we need for the server to run, but don't
+// want to hard-code. Because hard-coding is bad.
+type ServerSettings struct {
+	EmailSettings struct {
+		SEND_EMAILS     bool   `yaml:"sendmail"`
+		SMTP_PORT       int    `yaml:"smtp_port"`
+		SMTP_PASSWORD   string `yaml:"passwd"`
+		SMTP_USER       string `yaml:"username"`
+		SMTP_SERVER     string `yaml:"server"`
+		SENDER_EMAIL    string `yaml:"email"`
+		SENDER_IDENTITY string `yaml:"identity"`
+	} `yaml:"Email Settings"`
+	CamundaHost struct {
+		Name     string `yaml:"name"`
+		Port     int    `yaml:"port"`
+		Protocol string `yaml:"protocol"`
+		Host     string `yaml:"host"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+	} `yaml:"Camunda Host"`
+	ForumSettings []struct {
+		Name    string `yaml:"name"`
+		URL     string `yaml:"serverUrl"`
+		APIKey  string `yaml:"apikey"`
+		APIUser string `yaml:"apiuser"`
+		Exact   int    `yaml:"exact"`
+	} `yaml:"Forum Settings"`
 }
 
-// DiscoursePost struct for data from Discourse.
-type DiscoursePost struct {
-	Post struct {
-		ID                int       `json:"id"`
-		Name              string    `json:"name"`
-		Username          string    `json:"username"`
-		AvatarTemplate    string    `json:"avatar_template"`
-		CreatedAt         time.Time `json:"created_at"`
-		Cooked            string    `json:"cooked"`
-		PostNumber        int       `json:"post_number"`
-		PostType          int       `json:"post_type"`
-		UpdatedAt         time.Time `json:"updated_at"`
-		ReplyCount        int       `json:"reply_count"`
-		ReplyToPostNumber int       `json:"reply_to_post_number"`
-		QuoteCount        int       `json:"quote_count"`
-		IncomingLinkCount int       `json:"incoming_link_count"`
-		Reads             int       `json:"reads"`
-		Score             int       `json:"score"`
-		TopicID           int       `json:"topic_id"`
-		TopicSlug         string    `json:"topic_slug"`
-		TopicTitle        string    `json:"topic_title"`
-		CategoryID        int       `json:"category_id"`
-		DisplayUsername   string    `json:"display_username"`
-		PrimaryGroupName  string    `json:"primary_group_name"`
-		Version           int       `json:"version"`
-		UserTitle         string    `json:"user_title"`
-		ReplyToUser       struct {
-			Username       string `json:"username"`
-			AvatarTemplate string `json:"avatar_template"`
-		} `json:"reply_to_user"`
-		Bookmarked                  bool        `json:"bookmarked"`
-		Raw                         string      `json:"raw"`
-		Moderator                   bool        `json:"moderator"`
-		Admin                       bool        `json:"admin"`
-		Staff                       bool        `json:"staff"`
-		UserID                      int         `json:"user_id"`
-		Hidden                      bool        `json:"hidden"`
-		TrustLevel                  int         `json:"trust_level"`
-		DeletedAt                   interface{} `json:"deleted_at"`
-		UserDeleted                 bool        `json:"user_deleted"`
-		EditReason                  interface{} `json:"edit_reason"`
-		Wiki                        bool        `json:"wiki"`
-		ReviewableID                interface{} `json:"reviewable_id"`
-		ReviewableScoreCount        int         `json:"reviewable_score_count"`
-		ReviewableScorePendingCount int         `json:"reviewable_score_pending_count"`
-		TopicPostsCount             int         `json:"topic_posts_count"`
-		TopicFilteredPostsCount     int         `json:"topic_filtered_posts_count"`
-		TopicArchetype              string      `json:"topic_archetype"`
-		CategorySlug                string      `json:"category_slug"`
-		Event                       interface{} `json:"event"`
-	} `json:"post"`
-}
+var serverSettings = ServerSettings{}
 
-type Relations struct {
-	Post []struct {
-		ID             int    `json:"id"`
-		TopicID        int    `json:"topic_id"`
-		PostNumber     int    `json:"post_number"`
-		Excerpt        string `json:"excerpt"`
-		Username       string `json:"username"`
-		AvatarTemplate string `json:"avatar_template"`
-	} `json:"post"`
-}
-type queryResponse struct {
-	Success     bool          `json:"success"`
-	Errors      []interface{} `json:"errors"`
-	Duration    float64       `json:"duration"`
-	ResultCount int           `json:"result_count"`
-	Params      struct {
-	} `json:"params"`
-	Columns      []string `json:"columns"`
-	DefaultLimit int      `json:"default_limit"`
-	Relations    struct {
-		Post []struct {
-			ID             int    `json:"id"`
-			TopicID        int    `json:"topic_id"`
-			PostNumber     int    `json:"post_number"`
-			Excerpt        string `json:"excerpt"`
-			Username       string `json:"username"`
-			AvatarTemplate string `json:"avatar_template"`
-		} `json:"post"`
-	} `json:"relations"`
-	Colrender struct {
-		Num0 string `json:"0"`
-	} `json:"colrender"`
-	Rows [][]string `json:"rows"`
-}
 
-type CamundaProcess []struct {
-	ID                       string      `json:"id"`
-	BusinessKey              interface{} `json:"businessKey"`
-	ProcessDefinitionID      string      `json:"processDefinitionId"`
-	ProcessDefinitionKey     string      `json:"processDefinitionKey"`
-	ProcessDefinitionName    string      `json:"processDefinitionName"`
-	ProcessDefinitionVersion int         `json:"processDefinitionVersion"`
-	StartTime                string      `json:"startTime"`
-	EndTime                  interface{} `json:"endTime"`
-	RemovalTime              interface{} `json:"removalTime"`
-	DurationInMillis         interface{} `json:"durationInMillis"`
-	StartUserID              interface{} `json:"startUserId"`
-	StartActivityID          string      `json:"startActivityId"`
-	DeleteReason             interface{} `json:"deleteReason"`
-	RootProcessInstanceID    string      `json:"rootProcessInstanceId"`
-	SuperProcessInstanceID   interface{} `json:"superProcessInstanceId"`
-	SuperCaseInstanceID      interface{} `json:"superCaseInstanceId"`
-	CaseInstanceID           interface{} `json:"caseInstanceId"`
-	TenantID                 interface{} `json:"tenantId"`
-	State                    string      `json:"state"`
-}
 
+// ProcessQueryResult is what we get from a process query to Camunda Engine
 type ProcessQueryResult []struct {
 	Links          []interface{} `json:"links"`
 	ID             string        `json:"id"`
@@ -262,51 +114,21 @@ func (se StatusError) Status() int {
 	return se.Code
 }
 
-// TODO fix comment.
-func sendData(s DiscoursePost) {
-
-	topic := s.Post.TopicTitle
-	post := s.Post.Raw
-	fmt.Println("Event: ", s.Post.Event)
-	if topic == "" {
-		fmt.Println("We don't care about these.")
-		return
-	}
-	ctx := context.Background()
-	client, err := language.NewClient(ctx, option.WithCredentialsFile("credentials.json"))
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	sentiment, err := analyzeSentiment(ctx, client, post)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if sentiment.DocumentSentiment.Score >= 0 {
-		fmt.Printf("Sentiment: %1f, positive\t", sentiment.DocumentSentiment.Score)
-	} else {
-		fmt.Printf("Sentiment: %1f negative\t", sentiment.DocumentSentiment.Score)
-	}
+// CamundaRestError is an error implementation that includes a time and message.
+type CamundaRestError struct {
+	When time.Time
+	What string
 }
 
-// [START language_entities_text]
-
-func analyzeEntities(ctx context.Context, client *language.Client, text string) (*languagepb.AnalyzeEntitiesResponse, error) {
-	return client.AnalyzeEntities(ctx, &languagepb.AnalyzeEntitiesRequest{
-		Document: &languagepb.Document{
-			Source: &languagepb.Document_Content{
-				Content: text,
-			},
-			Type: languagepb.Document_PLAIN_TEXT,
-		},
-		EncodingType: languagepb.EncodingType_UTF8,
-	})
+func (e CamundaRestError) Error() string {
+	return fmt.Sprintf("%v: %v", e.When, e.What)
 }
 
-// [END language_entities_text]
+// apologies. I _hate_ global vars, but I didn't have time to refactor everything
+// to make this work any other way.
+var ThemeTemp = ""
 
-// [START language_sentiment_text]
-
+// Run google Sentiment Analysis on the given string
 func analyzeSentiment(ctx context.Context, client *language.Client, text string) (*languagepb.AnalyzeSentimentResponse, error) {
 	return client.AnalyzeSentiment(ctx, &languagepb.AnalyzeSentimentRequest{
 		Document: &languagepb.Document{
@@ -318,75 +140,56 @@ func analyzeSentiment(ctx context.Context, client *language.Client, text string)
 	})
 }
 
-// [END language_sentiment_text]
-
-// [START language_syntax_text]
-
-func analyzeSyntax(ctx context.Context, client *language.Client, text string) (*languagepb.AnnotateTextResponse, error) {
-	return client.AnnotateText(ctx, &languagepb.AnnotateTextRequest{
-		Document: &languagepb.Document{
-			Source: &languagepb.Document_Content{
-				Content: text,
-			},
-			Type: languagepb.Document_PLAIN_TEXT,
-		},
-		Features: &languagepb.AnnotateTextRequest_Features{
-			ExtractSyntax: true,
-		},
-		EncodingType: languagepb.EncodingType_UTF8,
-	})
-}
-
-// [END language_syntax_text]
-
-// [START language_classify_text]
-
-func classifyText(ctx context.Context, client *language.Client, text string) (*languagepb.ClassifyTextResponse, error) {
-	return client.ClassifyText(ctx, &languagepb.ClassifyTextRequest{
-		Document: &languagepb.Document{
-			Source: &languagepb.Document_Content{
-				Content: text,
-			},
-			Type: languagepb.Document_PLAIN_TEXT,
-		},
-	})
-}
-
-// [END language_classify_text]
-
-// recieve topics from Discourse
+// recieve incoming form requests.
+// We don't allow GETs
 func topicEvent(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Incoming message ... ")
 	if r.Method == "GET" {
+		// you get nothing.
 		http.Error(w, "GET Method not supported", 400)
+		log.Warn("topicEvent: Rejected HTTP GET from ", r.Header.Get("X-Forwarded-For"))
+		return
 	} else {
+		var submitter = Submitter{}
 		data, err := ioutil.ReadAll(r.Body)
-		// fmt.Println(string(data))
 		if err != nil {
-			log.Fatal("Got no Data")
+			log.Error("topicEvent: Got no Data for form responses", err)
+			return
 		}
 		r.Body.Close()
 		qString := html.UnescapeString(string(data))
-		fmt.Println(qString)
 		formFields := strings.Split(qString, "&")
-		for x := 0; x < len(formFields); x++ {
-			fmt.Println(formFields[x])
-			if strings.HasPrefix(formFields[x], "username") {
-				submitter.Username = strings.ReplaceAll(strings.Split(formFields[x], "=")[1], "+", " ")
-			} else if strings.HasPrefix(formFields[x], "emailAddress") {
-				submitter.Email = strings.ReplaceAll(strings.Split(formFields[x], "=")[1], "%40", "@")
-			} else if strings.HasPrefix(formFields[x], "community") {
-				submitter.Forum = strings.Split(formFields[x], "=")[1]
-			} else if strings.HasPrefix(formFields[x], "searchterm") {
-				submitter.SearchTerm = strings.ReplaceAll(strings.Split(formFields[x], "=")[1], "+", " ")
-			} else {
-
+		for _, v := range formFields {
+			if strings.Contains(v, "=") {
+				split := strings.Split(v, "=")
+				switch split[0] {
+				case "username":
+					submitter.Username = strings.ReplaceAll(split[1], "+", " ")
+				case "emailAddress":
+					submitter.Email = strings.ReplaceAll(split[1], "%40", "@")
+				case "searchterm":
+					submitter.SearchTerm = strings.ReplaceAll(split[1], "+", " ")
+				case "community":
+					submitter.Forum = split[1]
+				case "exact":
+					submitter.Exact = split[1]
+					if submitter.Exact == "off" {
+						submitter.SearchTerm = strings.ReplaceAll(submitter.SearchTerm, " ", " AND ")
+					} else {
+						submitter.SearchTerm = fmt.Sprintf("\"%s\"", submitter.SearchTerm)
+					}
+				default:
+				}
 			}
 		}
+		submitter.ThemeTemplate = "./static/email"
 		// We only allow camunda employees, with their Camunda email address.
 		if !strings.HasSuffix(submitter.Email, "camunda.com") {
 			http.Redirect(w, r, "https://sentiment.camunda.com/sorry.html", http.StatusSeeOther)
+			log.Errorf("Outside email address: %s, IP: ", submitter.Email, r.Header.Get("X-Forwarded-For"))
 			return
 		}
+		// be polite.
 		http.Redirect(w, r, "https://sentiment.camunda.com/thanks.html", http.StatusSeeOther)
 		var variables = map[string]camundaclientgo.Variable{}
 		variables["username"] = camundaclientgo.Variable{
@@ -409,10 +212,18 @@ func topicEvent(w http.ResponseWriter, r *http.Request) {
 			Value: "true",
 			Type:  "boolean",
 		}
-		businessKey := fmt.Sprintf("SentimentAnalysis%s", RandStringBytesRmndr(8))
+		variables["exact"] = camundaclientgo.Variable{
+			Value: submitter.Exact,
+			Type:  "string",
+		}
+		// businessKey has to be unique, so me make it (mostly) unique
+		businessKey := fmt.Sprintf("SentimentAnalysis-%s", RandString(8))
+		log.Debugf("Using BusinessKey: %s\n", businessKey)
 		opts := camundaclientgo.ClientOptions{}
-		opts.EndpointUrl = camundaServer
+		opts.EndpointUrl = serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest"
 		opts.Timeout = time.Second * 20
+		opts.ApiUser = serverSettings.CamundaHost.User
+		opts.ApiPassword = serverSettings.CamundaHost.Password
 		client := camundaclientgo.NewClient(opts)
 		reqMessage := camundaclientgo.ReqMessage{}
 		reqMessage.BusinessKey = businessKey
@@ -420,14 +231,16 @@ func topicEvent(w http.ResponseWriter, r *http.Request) {
 		reqMessage.MessageName = "submit_form"
 		err = client.Message.SendMessage(&reqMessage)
 		if err != nil {
-			log.Printf("Error starting process: %s\n", err)
+			log.Errorf("topicEvent: Error starting process: %s\n", err)
 			return
 		}
 	}
+	log.Debug("Form Handling complete.")
 }
 
-func sendEmail(avg_sent float32, low_sent float32, low_post string, lowURL string, high_sent float32, high_post string, highURL string) error {
-
+// Actually send the email ...
+func sendEmail(avg_sent float32, low_sent float32, low_post string, lowURL string, high_sent float32, high_post string, highURL string, submitter Submitter) error {
+	log.Debugf("Sending email to: %s\n", submitter.Email)
 	h := hermes.Hermes{
 		Theme: new(SentimentTheme),
 		Product: hermes.Product{
@@ -435,79 +248,200 @@ func sendEmail(avg_sent float32, low_sent float32, low_post string, lowURL strin
 			Name: "Camunda, Inc.",
 			Link: "https://sentiment.camunda.com/",
 			// Optional product logo
-			Logo: "https://sentiment.camunda.com:443/images/Logo_White.svg",
+			Logo:      "https://sentiment.camunda.com/images/Logo_White.svg",
 			Copyright: "© 2021 Camunda, Inc.",
 		},
 	}
+	forum := ""
+	if submitter.Forum == "platform" {
+		forum = "<a href=\"https://forum.camunda.org/\">Platform</a>"
+	}
+	if submitter.Forum == "cloud" {
+		forum = "<a href=\"https://forum.camunda.io\">Cloud</a>"
+	}
+	if submitter.Forum == "bpmn" {
+		forum = "<a href=\"https://forum.bpmn.io/\">BPMN</a>"
+	}
+	// This is the body of our email ...
+	ft := ""
+	if submitter.Exact == "on" {
+		ft = fmt.Sprintf("Here is what we found in analyzing the exact phrase `%s` in the %s forum", submitter.SearchTerm, forum)
+	} else {
+		ft = fmt.Sprintf("Here is what we found in analyzing the phrase `%s` in the %s forum.", submitter.SearchTerm, forum)
+	}
+	fm2 := ft + `
+
+The search returned ` + fmt.Sprintf("%d", submitter.Total) + ` results.`
+	if submitter.Total > 0 {
+		fm2 += `
+The overall average sentiment was: 	**` + fmt.Sprintf("%.2f", avg_sent) + `**
+
+The high sentiment was: 		**` + fmt.Sprintf("%.2f", high_sent) + `**
+
+Here's an excerpt from that post:
+
+> ` + high_post + `
+
+You can read the whole post [here](` + highURL + `)
+
+The low sentiment was: 		**` + fmt.Sprintf("%.2f", low_sent) + `**
+
+Here's an excerpt from that post:
+
+> ` + low_post + `
+
+You can read the whole post [here](` + lowURL + `).
+`
+	} else {
+		fm2 += `
+You might try broadening your search terms in order to get more results
+`
+	}
+	fm2 += `
+
+## Data Submitted:
+- Submitter Name:	` + submitter.Username + `
+- Submitter Email:	` + submitter.Email + `
+- Forum Searched:	` + submitter.Forum + `
+- Search Term:	` + submitter.SearchTerm + `
+`
+
+	// This whole thing is a hack because Hermes templates are so unbelievably limited
+	// in usefulness. So we basically are only using Hermes for parts of the email process.
+	// Now we use BlackFriday to turn this Markdown string into an html string
+	output := blackfriday.Run([]byte(fm2), blackfriday.WithExtensions(blackfriday.LaxHTMLBlocks))
+	log.Debug("Message: ", string(output))
+	contents, err := ioutil.ReadFile(submitter.ThemeTemplate + ".html")
+	if err != nil {
+		log.Error("sendEmail: ", err)
+		return err
+	}
+	// hacky kludge has entered the chat
+	newFile := strings.Replace(string(contents), "{{FILL_IN_THIS}}", string(output), -1)
+	fl := "./temp-email/" + submitter.Email
+	err = ioutil.WriteFile(fl+".html", []byte(newFile), 0644)
+	if err != nil {
+		log.Error("sendEmail: ", err)
+		return err
+	}
+	contents, err = ioutil.ReadFile(submitter.ThemeTemplate + ".txt")
+	if err != nil {
+		log.Error("sendEmail: ", err)
+		return err
+	}
+	newFile = strings.Replace(string(contents), "{{FILL_IN_THIS}}", string(output), -1)
+	fl = "./temp-email/" + submitter.Email
+	err = ioutil.WriteFile(fl+".txt", []byte(newFile), 0644)
+	if err != nil {
+		log.Error("sendEmail: ", err)
+		return err
+	}
+	ThemeTemp = fl
+	// end of awful hack.
+	// we now continue with our regularly scheduled Hermes email
 	email := hermes.Email{
 		Body: hermes.Body{
-			Name: submitter.Username,
-			Intros: []string{
-				fmt.Sprintf("Here's what we found in analysing the term '%s'", submitter.SearchTerm),
-				fmt.Sprintf("The overall average sentiment was: %.2f", avg_sent),
-				fmt.Sprintf("The high sentiment was: %.2f", high_sent),
-				fmt.Sprintf("Here's an excerpt from that post: \n<blockquote>%s</blockquote>\n", high_post),
-				fmt.Sprintf("You can read the whole post <a href=\"%s\">here</a>", highURL),
-				fmt.Sprintf("The low sentiment was: %.2f", low_sent),
-				fmt.Sprintf("Here's an excerpt from that post: \n<blockquote>%s</blockquote>\n", low_post),
-				fmt.Sprintf("You can read the whole post <a href=\"%s\">here</a>", lowURL),
-			},
-			Dictionary: []hermes.Entry {
-				{Key: "Submitter Name", Value: submitter.Username},
-				{Key: "Submitter Email", Value: submitter.Email},
-				{Key: "Camunda Forum Searched", Value: submitter.Forum},
-				{Key: "Search Term", Value: submitter.SearchTerm},
-			},
+			Name:   submitter.Username,
+			Intros: []string{string(output)},
 		},
 	}
 
 	// Generate an HTML email with the provided contents (for modern clients)
 	emailBody, err := h.GenerateHTML(email)
 	if err != nil {
+		log.Error("sendEmail: ", err)
+		ThemeTemp = ""
 		return err
 	}
 
 	// Generate the plaintext version of the e-mail (for clients that do not support xHTML)
 	emailText, err := h.GeneratePlainText(email)
 	if err != nil {
+		log.Error("sendEmail: ", err)
+		ThemeTemp = ""
 		return err
 	}
 
-	// Optionally, preview the generated HTML e-mail by writing it to a local file
-	sendEmails := os.Getenv("HERMES_SEND_EMAILS") == "true"
-	if sendEmails {
-		port, _ := strconv.Atoi(os.Getenv("HERMES_SMTP_PORT"))
-		password := os.Getenv("HERMES_SMTP_PASSWORD")
-		SMTPUser := os.Getenv("HERMES_SMTP_USER")
+	if serverSettings.EmailSettings.SEND_EMAILS {
 		smtpConfig := smtpAuthentication{
-			Server:         os.Getenv("HERMES_SMTP_SERVER"),
-			Port:           port,
-			SenderEmail:    os.Getenv("HERMES_SENDER_EMAIL"),
-			SenderIdentity: os.Getenv("HERMES_SENDER_IDENTITY"),
-			SMTPPassword:   password,
-			SMTPUser:       SMTPUser,
+			Server:         serverSettings.EmailSettings.SMTP_SERVER,
+			Port:           serverSettings.EmailSettings.SMTP_PORT,
+			SenderEmail:    serverSettings.EmailSettings.SENDER_EMAIL,
+			SenderIdentity: serverSettings.EmailSettings.SENDER_IDENTITY,
+			SMTPPassword:   serverSettings.EmailSettings.SMTP_PASSWORD,
+			SMTPUser:       serverSettings.EmailSettings.SMTP_USER,
 		}
 		options := sendOptions{
 			To: submitter.Email,
 		}
 		options.Subject = "Camunda Sentiment Analysis Results"
-		fmt.Printf("Sending email '%s'...\n", options.Subject)
 		err = send(smtpConfig, options, string(emailBody), string(emailText))
 		if err != nil {
+			log.Error("sendEmail: ", err)
 			return err
 		}
 	}
+	err = os.Remove(fl + ".html")
+	if err != nil {
+		log.Warn("sendEmail: ", err)
+		return err
+	}
+	err = os.Remove(fl + ".txt")
+	if err != nil {
+		log.Warn("sendEmail: ", err)
+		return err
+	}
+	log.Debug("Email sent!")
 	return nil
 }
 
 func main() {
-	client := camundaclientgo.NewClient(camundaclientgo.ClientOptions{EndpointUrl: serverBase +":8443/engine-rest",
-		Timeout: time.Second * 20,
+	logPtr := flag.String("log", "Debug", "LogLevel, accepts Debug, Info, Warn, or Error")
+	fPtr := flag.String("file", "stdout", "Log File Location, or stdout for console logging")
+	flag.Parse()
+	if *logPtr == "Debug" {
+		log.SetLevel(log.DebugLevel)
+	} else if *logPtr == "Info" {
+		log.SetLevel(log.InfoLevel)
+	} else if *logPtr == "Warn" {
+		log.SetLevel(log.WarnLevel)
+	} else if *logPtr == "Error" {
+		log.SetLevel(log.ErrorLevel)
+	} else if *logPtr == "Trace" {
+		log.SetLevel(log.TraceLevel)
+	} else {
+		log.SetLevel(log.WarnLevel)
+	}
+	if *fPtr != "stdout" {
+		f, err := os.OpenFile(*fPtr, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+	} else {
+		log.SetOutput(os.Stdout)
+	}
+	dat, err := ioutil.ReadFile("./config.yaml")
+	if err != nil {
+		log.Fatal("No startup file: ", err)
+	}
+	err = yaml.Unmarshal(dat, &serverSettings)
+	if err != nil {
+		log.Fatal("Config file not a yaml file ", err)
+	}
+	log.Debug("Starting up!")
+	client := camundaclientgo.NewClient(camundaclientgo.ClientOptions{EndpointUrl: serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest",
+		Timeout:     time.Second * 20,
+		ApiUser:     serverSettings.CamundaHost.User,
+		ApiPassword: serverSettings.CamundaHost.Password,
 	})
 	logger := func(err error) {
-		fmt.Println(err.Error())
+		log.Error(err)
 	}
 	asyncResponseTimeout := 5000
+	// get a process instance to work with
+
 	proc := processor.NewProcessor(client, &processor.ProcessorOptions{
 		WorkerId:                  "SentimentAnalyzer",
 		LockDuration:              time.Second * 20,
@@ -516,7 +450,8 @@ func main() {
 		LongPollingTimeout:        20 * time.Second,
 		AsyncResponseTimeout:      &asyncResponseTimeout,
 	}, logger)
-	fmt.Println("Sentiment Processor started ... ")
+	log.Debug("Processor started ... ")
+	// add a handler for checking the existing Queue
 	proc.AddHandler(
 		&[]camundaclientgo.QueryFetchAndLockTopic{
 			{TopicName: "checkQueue"},
@@ -525,6 +460,8 @@ func main() {
 			return queueStatus(ctx.Task.Variables, ctx)
 		},
 	)
+	log.Debug("checkQueue Handler started ... ")
+	// Handler for running a full sentiment analysis
 	proc.AddHandler(
 		&[]camundaclientgo.QueryFetchAndLockTopic{
 			{TopicName: "runThisAnalysis"},
@@ -533,6 +470,8 @@ func main() {
 			return runAnalysis(ctx.Task.Variables, ctx)
 		},
 	)
+	log.Debug("runAnalysis Handler started ... ")
+	// Handler to check for waiting processes
 	proc.AddHandler(
 		&[]camundaclientgo.QueryFetchAndLockTopic{
 			{TopicName: "checkForNext"},
@@ -541,6 +480,8 @@ func main() {
 			return getNext(ctx.Task.Variables, ctx)
 		},
 	)
+	log.Debug("checkForNext Handler started ... ")
+	// process to fire off the next sentiment analysis
 	proc.AddHandler(
 		&[]camundaclientgo.QueryFetchAndLockTopic{
 			{TopicName: "fireNext"},
@@ -549,72 +490,67 @@ func main() {
 			return fireNext(ctx.Task.Variables, ctx)
 		},
 	)
-	fmt.Println("Starting up ... ")
+	log.Debug("fireNext Handler started ... ")
 	http.HandleFunc("/sentiment", topicEvent)
-	http.Handle("/", http.FileServer(http.Dir("./static")))
-	// // http.Handle("/test/", http.StripPrefix("/test", fs)) // set router
-	err := http.ListenAndServeTLS(":443", "/etc/letsencrypt/live/sentiment.camunda.com/cert.pem", "/etc/letsencrypt/live/sentiment.camunda.com/privkey.pem", nil)
+	// http.Handle("/", http.FileServer(http.Dir("./static")))
+	err = http.ListenAndServeTLS(":9999", "./cert1.pem", "./privkey1.pem", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
+// run a `GET` request against the specified Camunda Engine URL and return the results
 func getUrl(url string) ProcessQueryResult {
+	log.Debugf("getting URL %s", url)
 	var DefaultClient = &http.Client{}
-	fmt.Println(url)
 	request, err := http.NewRequest("GET", url, nil)
+	request.SetBasicAuth(serverSettings.CamundaHost.User, serverSettings.CamundaHost.Password)
 	if err != nil {
-		fmt.Println("Request Object Failure")
-		log.Fatal(err)
+		log.Error("getUrl: ", err)
 	}
-
 	res, err := DefaultClient.Do(request)
 	if err != nil {
-		fmt.Println("HTTP GET Failed!", url)
-		log.Fatal(err)
+		log.Error("getUrl: ", err)
 	}
 	if res.StatusCode >= 220 {
-		fmt.Println("Got other than Code 200/204")
-		fmt.Println("Code: ", res.StatusCode)
-		// log. Fatal(res.StatusCode)
+		log.Warnf("getUrl: URL: %s : Status: %d", url, res.StatusCode)
 	}
 	data, err := ioutil.ReadAll(res.Body)
-	// fmt.Println("Data: ", string(data))
 	if err != nil {
-		log.Fatal("Got no Data")
+		log.Errorf("getUrl: Got no Data from %s", url)
 	}
+	log.Debugf("Got data: %s", string(data))
 	res.Body.Close()
 	garbage := ProcessQueryResult{}
-	var prettyJSON bytes.Buffer
-	err = json.Indent(&prettyJSON, data, "", "\t")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(prettyJSON.Bytes()))
 	err = json.Unmarshal(data, &garbage)
 	if err != nil {
-		log.Fatal(err)
+		log.Error("getUrl: ", err)
 	}
 	return garbage
 }
 
+// fire of fthe next waiting process
 func fireNext(newVars map[string]camundaclientgo.Variable, contx *processor.Context) error {
-	fmt.Println("Firing next process ...")
+	log.Debug("Firing Next Process")
 	// complete the process first, else it shows up as still active and all hell breaks loose
 	err := contx.Complete(processor.QueryComplete{Variables: &contx.Task.Variables})
 	if err != nil {
-		log.Fatal(err)
+		log.Error("Fire next: ", err)
+		return err
 	}
 	// get a list of waiting processes
-	garbage := getUrl(camundaServer + "/process-instance?businessKeyLike=SentimentAnalysis&processDefinitionKey=SentimentHandler&variable=queue_eg_true")
+	cURL := serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest" + "/process-instance?businessKeyLike=SentimentAnalysis&processDefinitionKey=SentimentHandler&variable=queue_eg_true"
+	garbage := getUrl(cURL)
 	if garbage == nil {
-		log.Fatal("Failed to get next for unknown reasons")
+		log.Error("fireNext: Failed to get next for unknown reasons")
 	}
 	if len(garbage) >= 1 { // there's at least one process waiting
-
+		log.Debug("Found a waiting process ...")
 		opts := camundaclientgo.ClientOptions{}
-		opts.EndpointUrl = camundaServer
+		opts.EndpointUrl = serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest"
 		opts.Timeout = time.Second * 20
+		opts.ApiUser = serverSettings.CamundaHost.User
+		opts.ApiPassword = serverSettings.CamundaHost.Password
 		client := camundaclientgo.NewClient(opts)
 		reqMessage := camundaclientgo.ReqMessage{}
 		reqMessage.BusinessKey = garbage[0].BusinessKey
@@ -622,37 +558,98 @@ func fireNext(newVars map[string]camundaclientgo.Variable, contx *processor.Cont
 		reqMessage.MessageName = "RunNext"
 		err := client.Message.SendMessage(&reqMessage)
 		if err != nil {
-			log.Printf("Error starting process: %s\n", err)
+			log.Warnf("fireNext: Error starting process: %s\n", err)
 			return err
 		}
-
-		return err
 	}
+	log.Debug("Fire Next Complete")
 	return nil
 }
 
 // check if there's a 'next' process.
 func getNext(newVars map[string]camundaclientgo.Variable, contx *processor.Context) error {
-	fmt.Println("Getting next process ...")
-	garbage := getUrl(camundaServer + "/process-instance?businessKeyLike=SentimentAnalysis&processDefinitionKey=SentimentHandler&variable=queue_eg_true")
+	log.Debug("Getting next ...")
+	// cClient := camundaclientgo.NewClient(camundaclientgo.ClientOptions{EndpointUrl: serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest",
+	// 	Timeout: time.Second * 20,
+	// })
+	// qParams := make(map[string]string)
+	// qParams["businessKeyLike"]="SentimentAnalysis"
+	// qParams["processDefinitionKey"]="SentimentHandler"
+	// qParams["variable"]="queue_eg_true"
+	// pParams := make(map[string]string)
+	// pParams["businessKeyLike"]="SentimentAnalysis"
+	// pParams["processDefinitionKey"]="SentimentHandler"
+	// pParams["latestVersion"]="true"
+	// pDefs, err := cClient.ProcessDefinition.GetList(pParams)
+	// if err != nil {
+	// 	log.Error(err)
+	// }
+	// garbage := pDefs
+	// exProc := ""
+	// for _, t := range pDefs {
+	// 	if t.Name == "SentimentHandler" {
+	// 		exProc = t.Id
+	// 		break
+	// 	}
+	// }
+	// if exProc != "" {
+	// cClient.ProcessInstance.GetList(qParams)
+	// }
+
+	// if len(garbage) >= 1 {
+	// 	varb := contx.Task.Variables
+	// 	varb["foundNext"] = camundaclientgo.Variable{Value: "true", Type: "boolean"}
+	// 	err := contx.Complete(processor.QueryComplete{Variables: &varb})
+	// 	if err != nil {
+	// 		log.Error("getNext: ", err)
+	// 		return err
+	// 	}
+	// } else {
+	// 	varb := contx.Task.Variables
+	// 	varb["foundNext"] = camundaclientgo.Variable{Value: "false", Type: "boolean"}
+	// 	err := contx.Complete(processor.QueryComplete{Variables: &varb})
+	// 	if err != nil {
+	// 		log.Error("getNext: ", err)
+	// 		return err
+	// 	}
+	// }
+	surl := serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest" + "/process-instance?businessKeyLike=SentimentAnalysis&processDefinitionKey=SentimentHandler&variable=queue_eg_true"
+	garbage := getUrl(surl)
 	if garbage == nil {
-		log.Fatal("GET URL Failed for unknown reasons")
+		e := CamundaRestError{When: time.Now().UTC(), What: "Got no content from Camunda Engine"}
+		log.Errorf("getNext: GET URL %s Failed for unknown reasons", surl)
+		return e
 	}
 	if len(garbage) >= 1 {
+		log.Debug("Found a process in the queue ...")
 		varb := contx.Task.Variables
 		varb["foundNext"] = camundaclientgo.Variable{Value: "true", Type: "boolean"}
 		err := contx.Complete(processor.QueryComplete{Variables: &varb})
-		return err
+		if err != nil {
+			log.Error("getNext: ", err)
+			return err
+		}
 	} else {
 		varb := contx.Task.Variables
 		varb["foundNext"] = camundaclientgo.Variable{Value: "false", Type: "boolean"}
 		err := contx.Complete(processor.QueryComplete{Variables: &varb})
-		return err
+		if err != nil {
+			log.Error("getNext: ", err)
+			return err
+		}
 	}
+	log.Debug("Get next complete")
+	return nil
 }
 
 func runAnalysis(newVars map[string]camundaclientgo.Variable, contx *processor.Context) error {
-	fmt.Println("Running the analysis ...")
+	log.Debug("Running an analysis ... ")
+	cClient := camundaclientgo.NewClient(camundaclientgo.ClientOptions{EndpointUrl: serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest",
+		Timeout:     time.Second * 20,
+		ApiUser:     serverSettings.CamundaHost.User,
+		ApiPassword: serverSettings.CamundaHost.Password,
+	})
+
 	var avg_sent float32 = 0.00
 	var high_sent float32 = -100
 	var low_sent float32 = 100
@@ -661,166 +658,172 @@ func runAnalysis(newVars map[string]camundaclientgo.Variable, contx *processor.C
 	var highURL string = ""
 	var lowURL string = ""
 	sent_num := 0
-	thisQ, err := json.Marshal(contx.Task.Variables["searchterm"].Value)
+	f, err := json.Marshal(newVars["searchterm"].Value)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return err
 	}
-	formValues := url.Values{}
-	formValues.Set("query", string(thisQ))
-	var DefaultClient = &http.Client{}
+	fmt.Println(string(f))
+	thisQ := fmt.Sprintf("%s", newVars["searchterm"].Value)
 
+	thisQ = fmt.Sprintf("?q=%s", thisQ)
+	reg := regexp.MustCompile(`["]`)
+	thisQ = string(reg.ReplaceAll([]byte(thisQ), []byte("%22")))
+	reg = regexp.MustCompile(`[ ]`)
+	thisQ = string(reg.ReplaceAll([]byte(thisQ), []byte("%20")))
+	log.Debug("Search Term: ", thisQ)
 	urlPlace := ""
 	myKey := ""
-	if submitter.Forum == "platform" {
-		urlPlace = PlatformURL
-		myKey = PlatformAPIKey
-	} else if submitter.Forum == "Cloud" {
-		urlPlace = CloudURL
-		myKey = CloudAPIKey
-	} else if submitter.Forum == "BPMN.io" {
-		urlPlace = BPMNUrl
-		myKey = BPMNAPIKey
+	linker := ""
+	if newVars["forum"].Value == "platform" {
+		urlPlace = serverSettings.ForumSettings[0].URL
+		myKey = serverSettings.ForumSettings[0].APIKey
+	} else if newVars["forum"].Value == "cloud" {
+		urlPlace = serverSettings.ForumSettings[1].URL
+		myKey = serverSettings.ForumSettings[1].APIKey
+	} else if newVars["forum"].Value == "bpmn" {
+		urlPlace = serverSettings.ForumSettings[2].URL
+		myKey = serverSettings.ForumSettings[2].APIKey
 	}
-	err = extendLock(contx, int(5 * time.Second))
+	log.Debugf("Using Query URL: %s", urlPlace)
+	linker = strings.Split(urlPlace, "search")[0]
+	delay := int(2 * time.Second)
+	ext := camundaclientgo.QueryExtendLock{
+		NewDuration: &delay,
+		WorkerId:    &contx.Task.WorkerId,
+	}
+	err = cClient.ExternalTask.ExtendLock(contx.Task.Id, ext)
 	if err != nil {
+		log.Error("runAnalysis::extendLock: ", err)
 		return err
 	}
-	request, err := http.NewRequest("POST", urlPlace, strings.NewReader(formValues.Encode()))
+	// log.Debug("Sending query ...")
+	aq := NewAPIQuery(urlPlace, thisQ, myKey, "davidgs")
+	err = aq.SendRequest()
 	if err != nil {
-		fmt.Println("Request Object Failure")
+		log.Error("runAnalysis::SendRequest: ", err)
 		return err
 	}
-	request.Header.Set("Content-Type", "multipart/form-data")
-	request.Header.Set("Api-Key", myKey)
-	request.Header.Set("Api-Username", APIUser)
-	request.Header.Set("Accept", "application/json")
-
-	res, err := DefaultClient.Do(request)
-	if err != nil {
-		fmt.Printf("HTTP POST Failed! %s\n", urlPlace)
-		fmt.Println(err)
-		return err
-	}
-	if res.StatusCode != 200 {
-		fmt.Println("Got other than Code 200")
-		fmt.Println("Code: ", res.StatusCode)
-	}
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	res.Body.Close()
-	garbage := queryResponse{}
-	// var prettyJSON bytes.Buffer
-	// _ = json.Indent(&prettyJSON, data, "", "\t")
-	// fmt.Println(string(prettyJSON.Bytes()))
-	_ = json.Unmarshal(data, &garbage)
-
+	fmt.Printf("Query returned %d Results\n", len(aq.APIResponse.Posts))
 	ctx := context.Background()
 	client, err := language.NewClient(ctx, option.WithCredentialsFile("credentials.json"))
 	if err != nil {
-		log.Fatal(err)
+		log.Error("runAnalysis::NewClient: ", err)
+		return err
 	}
-	for x := 0; x < 10; x++ { // go the length of garbage
-		err = extendLock(contx, int(7 * time.Second))
+	log.Debugf("Analyzing %d posts.\n", len(aq.APIResponse.Posts))
+	for x := 0; x < len(aq.APIResponse.Posts); x++ {
+		err = cClient.ExternalTask.ExtendLock(contx.Task.Id, ext)
 		if err != nil {
+			log.Error("runAnalysis: ", err)
 			return err
 		}
-		sentiment, err := analyzeSentiment(ctx, client, garbage.Rows[x][1])
+		sentiment, err := analyzeSentiment(ctx, client, fmt.Sprintf("%v", aq.APIResponse.Posts[x].Blurb))
 		if err != nil {
-			log.Fatal(err)
+			log.Error("runAnalysis: ", err)
+			continue
 		}
-		pId := garbage.Relations.Post[x].ID
-		tId := garbage.Relations.Post[x].TopicID
-
-		fmt.Printf("ID: %d TopicID: %d\n", pId, tId)
-
-		reg := regexp.MustCompile(`[\n]`) // fix bolds (**foo**)
-		translated := string(reg.ReplaceAll([]byte(garbage.Rows[x][1]), []byte("")))
-		reg = regexp.MustCompile(`[']`)
-		translated = string(reg.ReplaceAll([]byte(translated), []byte("\\'")))
-		reg = regexp.MustCompile(`[\t]`)
-		translated = string(reg.ReplaceAll([]byte(translated), []byte(" ")))
-		// reg = regexp.MustCompile(`[,]`)
-		// translated = string(reg.ReplaceAll([]byte(translated), []byte("\\,")))
+		log.Debugf("Post %d/%d ID: %d TopicID: %d\n", x, len(aq.APIResponse.Posts), aq.APIResponse.Posts[x].ID, aq.APIResponse.Posts[x].TopicID)
+		log.Debugf("Post TopicId: %d Sentiment: %.2f Blurb: %s\n", aq.APIResponse.Posts[x].TopicID, sentiment.DocumentSentiment.Score, aq.APIResponse.Posts[x].Blurb)
 		avg_sent += sentiment.DocumentSentiment.Score
 		sent_num++
 		if sentiment.DocumentSentiment.Score >= 0 {
 			if sentiment.DocumentSentiment.Score > high_sent {
 				high_sent = sentiment.DocumentSentiment.Score
-				high_post = garbage.Relations.Post[x].Excerpt
-				highURL = fmt.Sprintf("%s/t/%d", urlPlace, garbage.Relations.Post[x].TopicID)
+				high_post = aq.APIResponse.Posts[x].Blurb
+				highURL = fmt.Sprintf("%s/t/%d", linker, aq.APIResponse.Posts[x].TopicID)
 			}
 		} else {
 			if sentiment.DocumentSentiment.Score < low_sent {
 				low_sent = sentiment.DocumentSentiment.Score
-				low_post = translated
-				lowURL = fmt.Sprintf("%s/t/%d", urlPlace, garbage.Relations.Post[x].TopicID)
+				low_post = aq.APIResponse.Posts[x].Blurb
+				lowURL = fmt.Sprintf("%s/t/%d", linker, aq.APIResponse.Posts[x].TopicID)
 			}
 		}
 		time.Sleep(1 * time.Second)
 	}
-	avg_sent = avg_sent / float32(sent_num)
-	fmt.Printf("Average: %.2f\nLow score: %.2f\nLow Post: %s\nHigh score: %.2f\nHigh post: %s\n", avg_sent, low_sent, low_post, high_sent, high_post)
-	err = sendEmail(avg_sent, low_sent, low_post, lowURL, high_sent, high_post, highURL)
+	err = contx.Complete(processor.QueryComplete{Variables: &contx.Task.Variables})
 	if err != nil {
+		log.Error("Cannot complete task: ", err)
 		return err
 	}
-	err = contx.Complete(processor.QueryComplete{Variables: &contx.Task.Variables})
-	return err
+	log.Debugf("Link to article: %s", linker)
+	var submitter = Submitter{}
+	submitter.Email = fmt.Sprint(contx.Task.Variables["email"].Value)
+	submitter.Username = fmt.Sprint(contx.Task.Variables["username"].Value)
+	submitter.Forum = fmt.Sprint(contx.Task.Variables["forum"].Value)
+	submitter.SearchTerm = fmt.Sprint(contx.Task.Variables["searchterm"].Value)
+	submitter.Exact = fmt.Sprint(contx.Task.Variables["exact"].Value)
+	submitter.ThemeTemplate = "./static/email"
+	submitter.Total = len(aq.APIResponse.Posts)
+	avg_sent = avg_sent / float32(sent_num)
+	log.Debugf("Average: %.2f\nLow score: %.2f\nLow Post: %s\nHigh score: %.2f\nHigh post: %s\n", avg_sent, low_sent, low_post, high_sent, high_post)
+	err = sendEmail(avg_sent, low_sent, low_post, lowURL, high_sent, high_post, highURL, submitter)
+	if err != nil {
+		log.Error("runAnalysis: ", err)
+		return err
+	}
+
+	log.Debug("Analysis Complete.")
+	return nil
 }
 
 func extendLock(contx *processor.Context, extTime int) error {
-	fmt.Printf("Extending lock by %d\n", extTime)
 	var DefaultClient = &http.Client{}
 	extender := make(map[string]interface{})
 	extender["newDuration"] = extTime
 	extender["workerId"] = "SentimentAnalyzer"
-	data, err := json.Marshal(extender)
-	exUrl := fmt.Sprintf("%s/external-task/%s/extendLock", camundaServer, contx.Task.Id)
-	fmt.Println(exUrl)
+	data, _ := json.Marshal(extender)
+	exUrl := fmt.Sprintf("%s/external-task/%s/extendLock", serverSettings.CamundaHost.Protocol+"://"+serverSettings.CamundaHost.Host+":"+fmt.Sprintf("%d", serverSettings.CamundaHost.Port)+"/engine-rest", contx.Task.Id)
 	request, err := http.NewRequest("POST", exUrl, bytes.NewReader(data))
 	if err != nil {
-		fmt.Println("Request Object Failure")
+		log.Error("extendLock: ", err)
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 	res, err := DefaultClient.Do(request)
 	if err != nil {
-		fmt.Println(exUrl)
-		fmt.Printf("HTTP POST Failed! %s\n", exUrl)
-		fmt.Println(err)
+		log.Error("extendLock: ", err)
 		return err
 	}
 	if res.StatusCode != 204 {
-		fmt.Println("Runner Got other than Code 204")
-		fmt.Println("Code: ", res.StatusCode)
-		return nil
-		// log. Fatal(res.StatusCode)
+		e := CamundaRestError{When: time.Now().UTC(), What: fmt.Sprintf("extendLock got status code: %d", res.StatusCode)}
+		log.Error(e)
+		return e
 	}
 	return nil
 }
 
 // Check to see if any sentiment analysis is going on. If it is, park this process until it's done.
 func queueStatus(newVars map[string]camundaclientgo.Variable, contx *processor.Context) error {
-	fmt.Println("Checking the queue ... ")
-
-	garbage := getUrl(camundaServer + "/process-instance?businessKeyLike=SentimentAnalysis&processDefinitionKey=runAnalysis")
+	log.Debug("Checking the queue ... ")
+	cURL := serverSettings.CamundaHost.Protocol + "://" + serverSettings.CamundaHost.Host + ":" + fmt.Sprintf("%d", serverSettings.CamundaHost.Port) + "/engine-rest" + "/process-instance?businessKeyLike=SentimentAnalysis&processDefinitionKey=runAnalysis"
+	garbage := getUrl(cURL)
 	if garbage == nil {
-		log.Fatal("Getting data failed for unknown reasons")
+		e := CamundaRestError{When: time.Now().UTC(), What: fmt.Sprintf("queueStatus: %s returned empty data", cURL)}
+		log.Error("queueStatus: ", e)
+		return e
 	}
 	if len(garbage) == 0 { // no running instances
 		varb := contx.Task.Variables
 		varb["queue"] = camundaclientgo.Variable{Value: "false", Type: "boolean"}
 		err := contx.Complete(processor.QueryComplete{Variables: &varb})
-		return err
+		if err != nil {
+			log.Error("queuStatus: ", err)
+			return err
+		}
 	} else {
 		varb := contx.Task.Variables
 		varb["queue"] = camundaclientgo.Variable{Value: "true", Type: "boolean"}
 		err := contx.Complete(processor.QueryComplete{Variables: &varb})
-		return err
+		if err != nil {
+			log.Error("queuStatus: ", err)
+			return err
+		}
 	}
+	log.Debug("Queue check complete.")
+	return nil
 }
 
 type smtpAuthentication struct {
@@ -840,51 +843,45 @@ type sendOptions struct {
 
 // send sends the email
 func send(smtpConfig smtpAuthentication, options sendOptions, htmlBody string, txtBody string) error {
-
+	log.Debug("Sending email ... ")
 	if smtpConfig.Server == "" {
 		return errors.New("SMTP server config is empty")
 	}
 	if smtpConfig.Port == 0 {
 		return errors.New("SMTP port config is empty")
 	}
-
 	if smtpConfig.SMTPUser == "" {
 		return errors.New("SMTP user is empty")
 	}
-
 	if smtpConfig.SenderIdentity == "" {
 		return errors.New("SMTP sender identity is empty")
 	}
-
 	if smtpConfig.SenderEmail == "" {
 		return errors.New("SMTP sender email is empty")
 	}
-
 	if options.To == "" {
 		return errors.New("no receiver emails configured")
 	}
-
 	from := mail.Address{
 		Name:    smtpConfig.SenderIdentity,
 		Address: smtpConfig.SenderEmail,
 	}
-
 	m := gomail.NewMessage()
 	m.SetHeader("From", from.String())
 	m.SetHeader("To", options.To)
 	m.SetHeader("Subject", options.Subject)
-
 	m.SetBody("text/plain", txtBody)
 	m.AddAlternative("text/html", htmlBody)
-
 	d := gomail.NewDialer(smtpConfig.Server, smtpConfig.Port, smtpConfig.SMTPUser, smtpConfig.SMTPPassword)
-
+	log.Debug("Email sent.")
 	return d.DialAndSend(m)
 }
 
+// We use these to generate a random string
 const letterBytes = "+-=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-func RandStringBytesRmndr(n int) string {
+// here we generate the random string
+func RandString(n int) string {
 	b := make([]byte, n)
 	for i := range b {
 		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
@@ -892,40 +889,29 @@ func RandStringBytesRmndr(n int) string {
 	return string(b)
 }
 
-
-type SentimentTheme struct{
-	Term string
-}
+// This is our custome theme
+type SentimentTheme struct{}
 
 func (dt *SentimentTheme) Name() string {
 	return "Discourse Sentiment Theme"
 }
 
 func (dt *SentimentTheme) HTMLTemplate() string {
-    // Get the template from a file (if you want to be able to change the template live without retstarting your application)
-    // Or write the template by returning pure string here (if you want embbeded template and do not bother with external dependencies)
-		contents, err := ioutil.ReadFile("./static/email.html")
-		if err != nil {
-			log.Fatal(err)
-		}
-		return string(contents)
-
+	// ugly hack has entered the chat ...
+	contents, err := ioutil.ReadFile(ThemeTemp + ".html")
+	// end ugly hack
+	if err != nil { // we should really return the error here
+		log.Error("sentimentTheme::HTMLTemplate: ", err)
+	}
+	return string(contents)
 }
 
 func (dt *SentimentTheme) PlainTextTemplate() string {
-    // Get the template from a file (if you want to be able to change the template live without retstarting your application)
-    // Or write the template by returning pure string here (if you want embbeded template and do not bother with external dependencies)
-		contents, err := ioutil.ReadFile("./static/email.txt")
-		if err != nil {
-			log.Fatal(err)
-		}
-		return string(contents)
+	// ugly hack has entered the chat ...
+	contents, err := ioutil.ReadFile(ThemeTemp + ".txt")
+	// end ugly hack
+	if err != nil { // we really should return the error here
+		log.Error("SentimentTheme::PlainTextTemplate: ", err)
+	}
+	return string(contents)
 }
-
-// h := hermes.Hermes{
-//     Theme: new(SentimentTheme) // Set your fresh new theme here
-//     Product: hermes.Product{
-//         Name: "Hermes",
-//         Link: "https://example-hermes.com/",
-//     },
-// }

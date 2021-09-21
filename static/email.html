@@ -15,25 +15,244 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Abril+Fatface|PT+Sans:400,400i,700">
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
     integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-    <script src="/js/sentiment.js"></script>
-  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/images/apple-touch-icon-144-precomposed.png">
-  <link rel="shortcut icon" href="/images/favicon.png">
+  <link rel="apple-touch-icon-precomposed" sizes="144x144"
+    href="https://sentiment.camunda.com/images/apple-touch-icon-144-precomposed.png">
+  <link rel="shortcut icon" href="https://sentiment.camunda.com/images/favicon.jpg">
+
+  <style type="text/css">
+    html {
+      font-family: "PT Sans", Helvetica, Arial, sans-serif;
+    }
+
+    @media (min-width: 48em) {
+      html {
+        font-size: 16px;
+      }
+    }
+
+    @media (min-width: 58em) {
+      html {
+        font-size: 20px;
+      }
+    }
+
+
+    @media (min-width: 1200px) {
+      .container {
+        max-width: 1140px;
+      }
+    }
+
+    @media (min-width: 992px) {
+      .container {
+        max-width: 960px;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .container {
+        max-width: 720px;
+      }
+    }
+
+    @media (min-width: 576px) {
+      .container {
+        max-width: 540px;
+      }
+    }
+
+    .container {
+      width: 100%;
+      padding-right: 15px;
+      padding-left: 15px;
+      margin-right: auto;
+      margin-left: auto;
+    }
+
+    sidebar-nav {
+      padding-left: 0;
+      list-style: none;
+    }
+
+    dl,
+    ol,
+    ul {
+      margin-top: 0;
+      margin-bottom: 1rem;
+    }
+
+    *,
+    ::after,
+    ::before {
+      box-sizing: border-box;
+    }
+
+    /*
+     * Sidebar
+     *
+     * Flexible banner for housing site name, intro, and "footer" content. Starts
+     * out above content in mobile and later moves to the side with wider viewports.
+     */
+
+    .sidebar {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: rgba(255, 255, 255, .5);
+      background-color: #202020;
+
+    }
+
+    @media (min-width: 48em) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 18rem;
+        text-align: left;
+      }
+    }
+
+    /* Sidebar links */
+    .sidebar a {
+      color: #fff;
+    }
+
+    /* About section */
+    .sidebar-about h1 {
+      color: #fff;
+      margin-top: 0;
+      font-family: "Abril Fatface", serif;
+      font-size: 3.25rem;
+    }
+
+    /* Sidebar nav */
+    .sidebar-nav {
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .sidebar-nav-item {
+      display: block;
+    }
+
+    a.sidebar-nav-item:hover,
+    a.sidebar-nav-item:focus {
+      text-decoration: underline;
+    }
+
+    .sidebar-nav-item.active {
+      font-weight: bold;
+    }
+
+    /* Sticky sidebar
+     *
+     * Add the `sidebar-sticky` class to the sidebar's container to affix it the
+     * contents to the bottom of the sidebar in tablets and up.
+     */
+
+    @media (min-width: 48em) {
+      .sidebar-sticky {
+        position: absolute;
+        right: 1rem;
+        bottom: 1rem;
+        left: 1rem;
+      }
+    }
+
+
+    /* Container
+     *
+     * Align the contents of the site above the proper threshold with some margin-fu
+     * with a 25%-wide `.sidebar`.
+     */
+
+    .content {
+      padding-top: 4rem;
+      padding-bottom: 4rem;
+    }
+
+    @media (min-width: 48em) {
+      .content {
+        max-width: 38rem;
+        margin-left: 20rem;
+        margin-right: 2rem;
+      }
+    }
+
+    @media (min-width: 64em) {
+      .content {
+        margin-left: 22rem;
+        margin-right: 4rem;
+      }
+    }
+
+
+    /*
+     * Reverse layout
+     *
+     * Flip the orientation of the page by placing the `.sidebar` on the right.
+     */
+
+    @media (min-width: 48em) {
+      .layout-reverse .sidebar {
+        left: auto;
+        right: 0;
+      }
+
+      .layout-reverse .content {
+        margin-left: 2rem;
+        margin-right: 20rem;
+      }
+    }
+
+    @media (min-width: 64em) {
+      .layout-reverse .content {
+        margin-left: 4rem;
+        margin-right: 22rem;
+      }
+    }
+
+    /* Orange */
+    .theme-base-09 .sidebar {
+      background-color: #FF4700;
+      background-image: url(https://sentiment.camunda.com/images/bg-orange.png);
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: cover;
+    }
+
+    .theme-base-09 .content a,
+    .theme-base-09 .related-posts li a:hover {
+      color: #FF4700;
+    }
+
+    .lead {
+      font-size: 1.25rem;
+      font-weight: 300;
+    }
+  </style>
+
 </head>
 
 <body class="theme-base-09 ">
   <aside class="sidebar">
     <a href="{{.Hermes.Product.Link}}" target="_blank"></a>
     {{ if .Hermes.Product.Logo }}
-      <img src="{{.Hermes.Product.Logo | url }}" />
+    <img src="{{.Hermes.Product.Logo | url }}" />
     {{ else }}
-      {{ .Hermes.Product.Name }}
+    {{ .Hermes.Product.Name }}
     {{ end }}
     </a>
     <div class="container sidebar-sticky">
       <div class="sidebar-about">
-          <h1>Camunda Sentiment Analysis</h1>
+        <h1>Camunda Sentiment Analysis</h1>
         <p class="lead">
           A Sentiment Analysis Tool for Camunda Communities
+        </p>
+        <p class="lead">
+          Brought to you by</br><a href="https://confluence.camunda.com/display/camBPM/Developer+Relations" target="_blank">The
+            DevRel Team</a>
         </p>
       </div>
 
@@ -51,18 +270,12 @@
 
   <main class="content container">
     <div class="post">
+
       <h1>Here are your results!</h1>
-      <h1 id="thank-you-for-your-submission">Thank you {{if .Email.Body.Title }}{{ .Email.Body.Title }}{{ else }}{{ .Email.Body.Greeting }} {{
-      .Email.Body.Name }},{{ end }} for your submission</h1>
-      <p>The <em>Discourse Sentiment Analyzer™</em> has completed your request and the results are as follows:</p>
-      <p>{{ with .Email.Body.Intros }}
-            {{ if gt (len .) 0 }}
-              {{ range $line := . }}
-                <p>{{ $line }}</p>
-              {{ end }}
-            {{ end }}
-          {{ end }}
-      </p>
+      <h2 id="thank-you-for-your-submission">Thank you {{ .Email.Body.Name }} for your submission.</h2>
+      <h3>The <em>Discourse Sentiment Analyzer™</em> has completed your request and the results are as follows:</h3>
+      {{FILL_IN_THIS}}
+      <p><strong>About Sentiments:</strong> Sentiments are expressed in the range of -1.0 (extremely negative) to 1.0 (extremely positive). A score of 0.0 is exactly neutral.</p>
       <form action="https://sentiment.camunda.com/" method="GET" role="form" class="form-horizontal">
         <!-- Button -->
         <div class="form-group">
@@ -72,24 +285,24 @@
           </div>
         </div>
       </form>
+
       {{ with .Email.Body.Dictionary }}
-        {{ if gt (len .) 0 }}
-          <dl class="body-dictionary">
-          {{ range $entry := . }}
-            <dt>{{ $entry.Key }}:</dt>
-            <dd>{{ $entry.Value }}</dd>
-          {{ end }}
-          </dl>
+      {{ if gt (len .) 0 }}
+      <dl class="body-dictionary">
+        {{ range $entry := . }}
+        <dt>{{ $entry.Key }}:</dt>
+        <dd>{{ $entry.Value }}</dd>
         {{ end }}
+      </dl>
       {{ end }}
+      {{ end }}
+      <strong>Note:</strong> Please do not reply to this email as this is an unattended email account.`
     </div>
     <h2>Thank you so much for using our service,</h2>
     <p>Camunda DevRel Team</p>
 
   </main>
-  <script type="text/javascript">
-    document.addEventListener('DOMContentLoaded', setDate());
-  </script>
+
 </body>
 
 </html>
