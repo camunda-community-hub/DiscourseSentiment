@@ -1,0 +1,42 @@
+<h1>Thank you
+{{if .Email.Body.Title }}
+  {{ .Email.Body.Title }}
+{{ else }}
+  {{ .Email.Body.Greeting }} {{ .Email.Body.Name }},
+{{ end }} for your submission</h1>
+<p>The <em>Discourse Sentiment Analyzer™</em> has completed your request and the results are as follows:</p>
+{{FILL_IN_THIS}}
+<p><strong>About Sentiments:</strong> Sentiments are expressed in the range of -1.0 (extremely negative) to 1.0 (extremely positive). A score of 0.0 is exactly neutral.</p>
+{{ with .Email.Body.Intros }}
+  {{ range $line := . }}
+    <p>{{ $line }}</p>
+  {{ end }}
+{{ end }}
+{{ with .Email.Body.Dictionary }}
+  <ul>
+  {{ range $entry := . }}
+    <li>{{ $entry.Key }}: {{ $entry.Value }}</li>
+  {{ end }}
+  </ul>
+{{ end }}
+  {{ with .Email.Body.Actions }}
+    {{ range $action := . }}
+      <p>
+        {{ $action.Instructions }}
+        {{ if $action.InviteCode }}
+          {{ $action.InviteCode }}
+        {{ end }}
+        {{ if $action.Button.Link }}
+          {{ $action.Button.Link }}
+        {{ end }}
+      </p>
+    {{ end }}
+  {{ end }}
+{{ with .Email.Body.Outros }}
+  {{ range $line := . }}
+    <p>{{ $line }}<p>
+  {{ end }}
+{{ end }}
+<h2>Thank you so much for using our service,</h2>
+    <p>Camunda DevRel Team</p>
+<p>{{.Hermes.Product.Copyright}}</p>

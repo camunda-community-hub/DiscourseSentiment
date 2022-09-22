@@ -47,7 +47,6 @@ $_POST["insert your message here"]. "From: an@email.address");
 <p><textarea rows="10" cols="20" name="comments">Your comments</textarea></p>
 
 <p>On Which Forum:</p>
-<p><input type="radio" name="Camunda Cloud" value="Camunda Cloud"> Camunda Cloud</p>
 <p><input type="radio" name="Camunda Platform" value="Camunda Platform"> Camunda Platform</p>
 <p><input type="radio" name="BPMN.io" value="BPMN.io"> BPMN.io</p>
 
