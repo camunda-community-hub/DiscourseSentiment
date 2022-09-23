@@ -1,4 +1,4 @@
-<img src="https://img.shields.io/badge/Camunda%20DevRel%20Project-Created%20by%20the%20Camunda%20Developer%20Relations%20team-0Ba7B9">[![Proof of Concept](https://img.shields.io/badge/Lifecycle-Proof%20of%20Concept-blueviolet)](https://github.com/Camunda-Community-Hub/community/blob/main/extension-lifecycle.md#proof-of-concept-)
+<img src="https://img.shields.io/badge/Camunda%20DevRel%20Project-Created%20by%20the%20Camunda%20Developer%20Relations%20team-0Ba7B9"> [![](https://img.shields.io/badge/Lifecycle-Deprecated-yellowgreen)](https://github.com/Camunda-Community-Hub/community/blob/main/extension-lifecycle.md#deprecated-)
 
 # Discourse Topic Sentiment Analysis 
 ## This service allows you to choose any Discourse topic and run a complete sentiment Analysis on it based on all the posts referencing that topic
@@ -13,11 +13,7 @@ Currently, this project is a Proof of Concept. @davidgs created the initial [Let
 
 ### Project Roadmap:
 
-When the Discourse Sentiment Analysis tool is further along, you will be able to interact with it by doing the following:
-
-1. Fill out a form with a query term you would like to run against the Camunda Platform, BPMN.io, or Camunda Cloud forums: End of Q3 2021
-2. You will recieve an email letting you know your query has been entered into the processing que: End of Q3 2021
-3. Once processed, your query results will be emailed to you: End of Q3 2021
+This tool has been taken offline.
 
 ### Questions
 
